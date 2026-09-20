@@ -446,38 +446,6 @@ def build_rsvg(ctx: BuildContext) -> None:
     )
 
 
-def build_gmp(ctx: BuildContext) -> None:
-    autotools(ctx, extract(ctx, "gmp"))
-
-
-def build_unistring(ctx: BuildContext) -> None:
-    autotools(ctx, extract(ctx, "unistring"), "--disable-rpath")
-
-
-def build_nettle(ctx: BuildContext) -> None:
-    autotools(ctx, extract(ctx, "nettle"), "--disable-documentation", "--disable-openssl")
-
-
-def build_gnutls(ctx: BuildContext) -> None:
-    autotools(
-        ctx,
-        extract(ctx, "gnutls"),
-        "--disable-cxx",
-        "--disable-doc",
-        "--disable-libdane",
-        "--disable-nls",
-        "--disable-tests",
-        "--disable-tools",
-        "--with-included-libtasn1",
-        "--without-p11-kit",
-        install_prefix="/",
-        install_destdir=ctx.prefix,
-    )
-    _set_pkg_config_variables(
-        ctx.prefix / "lib" / "pkgconfig" / "gnutls.pc", {"prefix": str(ctx.prefix)}
-    )
-
-
 def build_vulkan_headers(ctx: BuildContext) -> None:
     cmake(ctx, extract(ctx, "vulkan_headers"), "-DVULKAN_HEADERS_ENABLE_TESTS=OFF")
 
@@ -1174,10 +1142,6 @@ RECIPES: tuple[Recipe, ...] = (
     ("libffi", unix, build_ffi),
     ("pcre2", unix, build_pcre2),
     ("glib", unix, build_glib),
-    ("gmp", linux, build_gmp),
-    ("unistring", linux, build_unistring),
-    ("nettle", linux, build_nettle),
-    ("gnutls", linux, build_gnutls),
     ("vulkan-headers", always, build_vulkan_headers),
     ("MoltenVK", macos, install_moltenvk),
     ("vulkan-loader", not_macos, build_vulkan_loader),

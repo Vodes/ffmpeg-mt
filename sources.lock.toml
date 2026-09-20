@@ -39,34 +39,6 @@ sha256 = "0b54f79df85912504de0b14aec7971e3f964491af1812d83447005807513cd9e"
 license = "0BSD AND GPL-2.0-or-later AND GPL-3.0-or-later"
 license_files = ["COPYING*", "LICENSE"]
 
-[sources.gmp]
-version = "6.3.0"
-url = "https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz"
-sha256 = "a3c2b80201b89e68616f4ad30bc66aee4927c3ce50e33929ca819d5c43538898"
-license = "LGPL-3.0-or-later OR GPL-2.0-or-later"
-license_files = ["COPYING*", "LICENSE"]
-
-[sources.unistring]
-version = "1.4.2"
-url = "https://ftp.gnu.org/gnu/libunistring/libunistring-1.4.2.tar.gz"
-sha256 = "e82664b170064e62331962126b259d452d53b227bb4a93ab20040d846fec01d8"
-license = "LGPL-3.0-or-later OR GPL-2.0-or-later"
-license_files = ["COPYING*"]
-
-[sources.nettle]
-version = "4.0"
-url = "https://ftp.gnu.org/gnu/nettle/nettle-4.0.tar.gz"
-sha256 = "3addbc00da01846b232fb3bc453538ea5468da43033f21bb345cb1e9073f5094"
-license = "LGPL-3.0-or-later OR GPL-2.0-or-later"
-license_files = ["COPYING*"]
-
-[sources.gnutls]
-version = "3.8.13"
-url = "https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.13.tar.xz"
-sha256 = "ffed8ec1bf09c2426d4f14aae377de4753b53e537d685e604e99a8b16ca9c97e"
-license = "LGPL-2.1-or-later"
-license_files = ["COPYING*", "LICENSE"]
-
 [sources.lamer]
 version = "3.101.0"
 url = "https://github.com/basswood-io/lamer/archive/refs/tags/v3.101.0.tar.gz"

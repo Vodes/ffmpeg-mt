@@ -66,7 +66,7 @@ def configure_flags(ctx: BuildContext, revision: int) -> list[str]:
     if ctx.target.linux:
         flags += [
             "--extra-libs=-lm",
-            "--enable-gnutls",
+            "--enable-openssl",
             "--enable-librsvg",
             "--enable-libssh",
             "--enable-libplacebo",
