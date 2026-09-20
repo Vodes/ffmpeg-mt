@@ -8,10 +8,10 @@ Silicon. FFmpeg and every linked third-party input are checksum-pinned in
 
 | Target | Build environment | Platform acceleration |
 | --- | --- | --- |
-| `linux-x86_64` | AlmaLinux 9, native GCC | VAAPI/DRM, Vulkan, OpenCL, NVIDIA, AMF, oneVPL/QSV |
-| `linux-arm64` | AlmaLinux 9, native GCC | VAAPI/DRM, Vulkan, OpenCL, NVIDIA headers |
-| `windows-x86_64` | AlmaLinux 9, LLVM-MinGW/UCRT | MediaFoundation, D3D11/12, DXVA2, Vulkan, OpenCL, NVIDIA, AMF, oneVPL/QSV |
-| `windows-arm64` | AlmaLinux 9, LLVM-MinGW/UCRT | MediaFoundation, D3D11/12, DXVA2, Vulkan, OpenCL |
+| `linux-x86_64` | manylinux_2_34, native GCC | VAAPI/DRM, Vulkan, OpenCL, NVIDIA, AMF, oneVPL/QSV |
+| `linux-arm64` | manylinux_2_34, native GCC | VAAPI/DRM, Vulkan, OpenCL, NVIDIA headers |
+| `windows-x86_64` | manylinux_2_34, LLVM-MinGW/UCRT | MediaFoundation, D3D11/12, DXVA2, Vulkan, OpenCL, NVIDIA, AMF, oneVPL/QSV |
+| `windows-arm64` | manylinux_2_34, LLVM-MinGW/UCRT | MediaFoundation, D3D11/12, DXVA2, Vulkan, OpenCL |
 | `macos-arm64` | native macOS 15, macOS 12 target | VideoToolbox, AudioToolbox, AVFoundation, CoreImage/Metal, OpenCL, static MoltenVK |
 
 The curated codec/filter surface includes AV1, H.264/H.265, VP8/VP9, Opus,
@@ -22,7 +22,7 @@ binary-size cost.
 
 ## Build
 
-The single build interface launches the AlmaLinux builder automatically for
+The single build interface launches the manylinux_2_34 builder automatically for
 Linux and Windows, and builds directly on macOS:
 
 ```console

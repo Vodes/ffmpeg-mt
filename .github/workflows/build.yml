@@ -28,18 +28,22 @@ jobs:
             runner: ubuntu-24.04
             container: true
             image_stage: linux_builder
+            base_image: quay.io/pypa/manylinux_2_34_x86_64@sha256:0b4acc5b3c4c797bb9a6286c4d15039962f61ee0c5426753afd5cbe45baebfc4
           - target: windows-x86_64
             runner: ubuntu-24.04
             container: true
             image_stage: builder
+            base_image: quay.io/pypa/manylinux_2_34_x86_64@sha256:0b4acc5b3c4c797bb9a6286c4d15039962f61ee0c5426753afd5cbe45baebfc4
           - target: linux-arm64
             runner: ubuntu-24.04-arm
             container: true
             image_stage: linux_builder
+            base_image: quay.io/pypa/manylinux_2_34_aarch64@sha256:db1a485b015c1d9a6d7e2929367a69a6f772964be06cca8fe585f959a47ec0b7
           - target: windows-arm64
             runner: ubuntu-24.04-arm
             container: true
             image_stage: builder
+            base_image: quay.io/pypa/manylinux_2_34_aarch64@sha256:db1a485b015c1d9a6d7e2929367a69a6f772964be06cca8fe585f959a47ec0b7
           - target: macos-arm64
             runner: macos-15
             container: false
@@ -69,14 +73,15 @@ jobs:
           context: .
           file: docker/Dockerfile
           target: ${{ matrix.image_stage }}
-          tags: ffmpeg-mt-builder:almalinux9
+          tags: ffmpeg-mt-builder:manylinux_2_34
           load: true
+          build-args: MANYLINUX_IMAGE=${{ matrix.base_image }}
           cache-from: type=gha,scope=builder-${{ runner.arch }}
           cache-to: type=gha,mode=max,scope=builder-${{ runner.arch }}
       - name: Install macOS build tools
         if: ${{ !matrix.container }}
         run: brew install autoconf automake cargo-c ccache cmake libtool meson nasm ninja pkg-config rust shaderc zstd
-      - name: Build in AlmaLinux 9
+      - name: Build in manylinux_2_34
         if: ${{ matrix.container }}
         env:
           FFMPEG_MT_SKIP_IMAGE_BUILD: "1"

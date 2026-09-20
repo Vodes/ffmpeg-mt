@@ -152,6 +152,15 @@ def test_container_pins_compatible_meson() -> None:
     assert "pip install --no-cache-dir meson==1.9.1 uv==0.8.22" in dockerfile
 
 
+def test_container_uses_prebuilt_llvm_mingw_for_both_host_architectures() -> None:
+    dockerfile = (ROOT / "docker" / "Dockerfile").read_text(encoding="utf-8")
+    assert "llvm-mingw-${LLVM_MINGW_VERSION}-ucrt-ubuntu-22.04-${host_arch}.tar.xz" in dockerfile
+    assert "amd64) host_arch=x86_64" in dockerfile
+    assert "arm64) host_arch=aarch64" in dockerfile
+    assert "/usr/lib/*-linux-gnu/libstdc++.so.6* /opt/llvm-mingw/host-libs/" in dockerfile
+    assert "./build-all.sh" not in dockerfile
+
+
 def test_vulkan_loader_uses_btbns_static_shim(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -228,17 +237,22 @@ def test_openssl_relocates_pkg_config_metadata(
 
 
 @pytest.mark.parametrize(
-    ("target", "stage"),
-    (("linux-x86_64", "linux_builder"), ("windows-x86_64", "builder")),
+    ("target", "machine", "stage", "base_arch"),
+    (
+        ("linux-x86_64", "x86_64", "linux_builder", "x86_64"),
+        ("windows-arm64", "aarch64", "builder", "aarch64"),
+    ),
 )
 def test_container_selects_only_the_required_image_stage(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     target: str,
+    machine: str,
     stage: str,
+    base_arch: str,
 ) -> None:
     commands: list[list[str]] = []
-    monkeypatch.setattr("scripts.build_container.platform.machine", lambda: "x86_64")
+    monkeypatch.setattr("scripts.build_container.platform.machine", lambda: machine)
     monkeypatch.setattr(
         "scripts.build_container.subprocess.run",
         lambda command, check: commands.append(command),
@@ -247,6 +261,8 @@ def test_container_selects_only_the_required_image_stage(
     run_in_container(tmp_path, target, 2, False, False)
 
     assert commands[0][commands[0].index("--target") + 1] == stage
+    base_image = commands[0][commands[0].index("--build-arg") + 1]
+    assert f"manylinux_2_34_{base_arch}@sha256:" in base_image
 
 
 @pytest.mark.parametrize("target", TARGETS)

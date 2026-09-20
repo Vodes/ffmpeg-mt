@@ -1,11 +1,14 @@
-FROM almalinux:9 AS packages
+ARG MANYLINUX_IMAGE=quay.io/pypa/manylinux_2_34_x86_64@sha256:0b4acc5b3c4c797bb9a6286c4d15039962f61ee0c5426753afd5cbe45baebfc4
+FROM ubuntu:22.04@sha256:b8b6ee6aa931ecd9d0d952abc34dc0e5f7c6a30c6bb71b079fe399fde0329c02 AS llvm_mingw_runtime
+
+FROM ${MANYLINUX_IMAGE} AS packages
 
 RUN dnf -y install dnf-plugins-core epel-release && \
     dnf config-manager --set-enabled crb && \
     dnf -y install \
       autoconf automake bison bzip2 cargo cargo-c ccache clang cmake diffutils file findutils \
       flex gcc gcc-c++ git glibc-static gperf gzip libstdc++-static libtool make nasm ninja-build \
-      patch perl python3.12 python3.12-pip python3.12-devel rsync alsa-lib-devel \
+      patch perl rsync alsa-lib-devel \
       pkgconf-pkg-config rust tar texinfo unzip vim-common which xz yasm zip zstd && \
     if [ "$(uname -m)" = x86_64 ]; then dnf -y install mesa-vulkan-drivers; fi && \
     dnf clean all
@@ -40,16 +43,28 @@ FROM base_builder AS linux_builder
 FROM base_builder AS builder
 
 ARG LLVM_MINGW_VERSION=20260908
-ARG LLVM_MINGW_SHA256=6409ef0f7278489698477dd008418b91b62245995c5e2f3c6b22500ef95d42e2
+ARG LLVM_MINGW_X86_64_SHA256=2258c745e3155870c80793f3e8c80b28fbde11b9ff73c4c78783635b3440b092
+ARG LLVM_MINGW_AARCH64_SHA256=c907dd2302a292b663add18752a55ce9d544ca0fd19cf33c086ca242d5994ea6
+ARG TARGETARCH
 
 WORKDIR /tmp/llvm-mingw
-RUN curl -fL --retry 5 \
-      -o source.tar.gz \
-      "https://github.com/mstorsjo/llvm-mingw/archive/refs/tags/${LLVM_MINGW_VERSION}.tar.gz" && \
-    echo "${LLVM_MINGW_SHA256}  source.tar.gz" | sha256sum -c - && \
-    tar -xzf source.tar.gz --strip-components=1 && \
-    ./build-all.sh /opt/llvm-mingw && \
+RUN case "${TARGETARCH}" in \
+      amd64) host_arch=x86_64; checksum="${LLVM_MINGW_X86_64_SHA256}" ;; \
+      arm64) host_arch=aarch64; checksum="${LLVM_MINGW_AARCH64_SHA256}" ;; \
+      *) echo "Unsupported LLVM-MinGW host architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
+    archive="llvm-mingw-${LLVM_MINGW_VERSION}-ucrt-ubuntu-22.04-${host_arch}.tar.xz" && \
+    curl -fL --retry 5 \
+      -o "${archive}" \
+      "https://github.com/mstorsjo/llvm-mingw/releases/download/${LLVM_MINGW_VERSION}/${archive}" && \
+    echo "${checksum}  ${archive}" | sha256sum -c - && \
+    mkdir -p /opt/llvm-mingw && \
+    tar -xJf "${archive}" --strip-components=1 -C /opt/llvm-mingw && \
     rm -rf /tmp/llvm-mingw
+
+COPY --from=llvm_mingw_runtime \
+    /usr/lib/*-linux-gnu/libstdc++.so.6* /opt/llvm-mingw/host-libs/
 
 ENV LLVM_MINGW_ROOT=/opt/llvm-mingw
 ENV PATH=/opt/llvm-mingw/bin:/root/.local/bin:${PATH}
+ENV LD_LIBRARY_PATH=/opt/llvm-mingw/host-libs:${LD_LIBRARY_PATH}
