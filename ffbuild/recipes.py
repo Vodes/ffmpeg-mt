@@ -207,6 +207,17 @@ def build_aribcaption(ctx: BuildContext) -> None:
 
 
 def build_openal(ctx: BuildContext) -> None:
+    source = extract(ctx, "openal")
+    if ctx.target.windows:
+        fmt_header = source / "fmt-11.1.1" / "include" / "fmt" / "format.h"
+        fmt_text = fmt_header.read_text(encoding="utf-8")
+        include_marker = "#  include <cstdint>  // uint32_t\n"
+        if fmt_text.count(include_marker) != 1:
+            raise RuntimeError("OpenAL Soft's bundled fmt has an unexpected include layout")
+        fmt_header.write_text(
+            fmt_text.replace(include_marker, include_marker + "#  include <stdlib.h>  // free\n"),
+            encoding="utf-8",
+        )
     args = [
         "-DLIBTYPE=STATIC",
         "-DALSOFT_UTILS=OFF",
@@ -219,7 +230,7 @@ def build_openal(ctx: BuildContext) -> None:
     ]
     if ctx.target.linux:
         args += ["-DALSOFT_BACKEND_ALSA=ON", "-DALSOFT_BACKEND_OSS=OFF"]
-    cmake(ctx, extract(ctx, "openal"), *args)
+    cmake(ctx, source, *args)
     pkg_config = ctx.prefix / "lib" / "pkgconfig" / "openal.pc"
     _ensure_static_cpp_runtime(ctx, pkg_config)
     if ctx.target.windows:
@@ -953,12 +964,13 @@ def build_srt(ctx: BuildContext) -> None:
 
 
 def build_rist(ctx: BuildContext) -> None:
+    args = ["-Dtest=false", "-Dbuilt_tools=false", "-Dbuiltin_cjson=true"]
+    if ctx.target.windows:
+        args.append("-Dhave_mingw_pthreads=true")
     meson(
         ctx,
         extract(ctx, "rist"),
-        "-Dtest=false",
-        "-Dbuilt_tools=false",
-        "-Dbuiltin_cjson=true",
+        *args,
     )
 
 
@@ -1053,6 +1065,34 @@ def build_placebo(ctx: BuildContext) -> None:
         *platform,
     )
     _ensure_static_cpp_runtime(ctx, ctx.prefix / "lib" / "pkgconfig" / "libplacebo.pc")
+
+
+def build_spirv_cross(ctx: BuildContext) -> None:
+    cmake(
+        ctx,
+        extract(ctx, "spirv_cross"),
+        "-DSPIRV_CROSS_SHARED=OFF",
+        "-DSPIRV_CROSS_STATIC=ON",
+        "-DSPIRV_CROSS_CLI=OFF",
+        "-DSPIRV_CROSS_ENABLE_TESTS=OFF",
+        "-DSPIRV_CROSS_FORCE_PIC=ON",
+        "-DSPIRV_CROSS_ENABLE_CPP=OFF",
+    )
+    pkg_config = ctx.prefix / "lib" / "pkgconfig" / "spirv-cross-c-shared.pc"
+    pkg_config.write_text(
+        "prefix=${pcfiledir}/../..\n"
+        "exec_prefix=${prefix}\n"
+        "libdir=${prefix}/lib\n"
+        "includedir=${prefix}/include/spirv_cross\n\n"
+        "Name: spirv-cross-c-shared\n"
+        "Description: C API for SPIRV-Cross\n"
+        "Version: 0.68.0\n"
+        "Libs: -L${libdir} -lspirv-cross-c -lspirv-cross-glsl -lspirv-cross-hlsl "
+        "-lspirv-cross-reflect -lspirv-cross-msl -lspirv-cross-util -lspirv-cross-core\n"
+        "Cflags: -I${includedir}\n",
+        encoding="utf-8",
+    )
+    _ensure_static_cpp_runtime(ctx, pkg_config)
 
 
 def build_shaderc(ctx: BuildContext) -> None:
@@ -1203,6 +1243,7 @@ RECIPES: tuple[Recipe, ...] = (
     ("amf-headers", lambda ctx: not_macos(ctx) and x86(ctx), build_amf),
     ("oneVPL", lambda ctx: not_macos(ctx) and x86(ctx), build_vpl),
     ("shaderc", always, build_shaderc),
+    ("SPIRV-Cross", windows, build_spirv_cross),
     ("libplacebo", always, build_placebo),
     ("fdk-aac", fdk, build_fdk_aac),
 )

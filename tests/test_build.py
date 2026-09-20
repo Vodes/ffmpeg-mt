@@ -199,6 +199,10 @@ def test_dependency_order_and_predicates(tmp_path: Path, target: str) -> None:
     else:
         assert names.index("vulkan-headers") < names.index("libplacebo")
     assert names.index("shaderc") < names.index("libplacebo")
+    if target.startswith("windows-"):
+        assert names.index("SPIRV-Cross") < names.index("libplacebo")
+    else:
+        assert "SPIRV-Cross" not in names
     assert ("libva" in names) is target.startswith("linux-")
     assert ("Implib.so" in names) is target.startswith("linux-")
     if target.startswith("linux-"):
@@ -562,7 +566,9 @@ def test_windows_openal_pkg_config_has_com_dependencies(
 ) -> None:
     ctx = context(tmp_path, "windows-x86_64")
     source = tmp_path / "openal"
-    source.mkdir()
+    fmt_header = source / "fmt-11.1.1" / "include" / "fmt" / "format.h"
+    fmt_header.parent.mkdir(parents=True)
+    fmt_header.write_text("#  include <cstdint>  // uint32_t\n", encoding="utf-8")
     monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
 
     def fake_cmake(*_args: object) -> None:

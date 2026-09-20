@@ -374,6 +374,13 @@ sha256 = "f924178e75e3293082481b25ed64d5e48a795b479dac3bd3c83d23070855df42"
 license = "Apache-2.0"
 license_files = ["LICENSE"]
 
+[sources.spirv_cross]
+version = "9c3c8e2cefdd8194b193bb8ed2fdff4d5527e382"
+url = "https://github.com/KhronosGroup/SPIRV-Cross/archive/9c3c8e2cefdd8194b193bb8ed2fdff4d5527e382.tar.gz"
+sha256 = "78939435d588998e5174a7865ddd36b6d9d7cd05eafac42d42ef537ea770b40a"
+license = "Apache-2.0 OR MIT"
+license_files = ["LICENSE"]
+
 [sources.shaderc_abseil]
 version = "1315c900e1ddbb08a23e06eeb9a06450052ccb5e"
 url = "https://github.com/abseil/abseil-cpp/archive/1315c900e1ddbb08a23e06eeb9a06450052ccb5e.tar.gz"
