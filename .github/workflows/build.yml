@@ -1,0 +1,129 @@
+name: build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      with_fdk_aac:
+        description: Build the local/private nonfree profile
+        type: boolean
+        default: false
+      release:
+        description: Publish a versioned GitHub release after all builds pass
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x86_64
+            runner: ubuntu-24.04
+            container: true
+          - target: windows-x86_64
+            runner: ubuntu-24.04
+            container: true
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+            container: true
+          - target: windows-arm64
+            runner: ubuntu-24.04-arm
+            container: true
+          - target: macos-arm64
+            runner: macos-15
+            container: false
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - uses: actions/cache@v6.1.0
+        with:
+          path: .cache/downloads
+          key: sources-${{ hashFiles('sources.lock.toml') }}
+      - uses: actions/cache@v6.1.0
+        with:
+          path: |
+            .cache/ccache
+            .cache/cargo
+          key: ccache-${{ matrix.target }}-${{ github.sha }}
+          restore-keys: ccache-${{ matrix.target }}-
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        if: ${{ matrix.container }}
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        if: ${{ matrix.container }}
+        with:
+          context: .
+          file: docker/Dockerfile
+          tags: ffmpeg-mt-builder:almalinux9
+          load: true
+          cache-from: type=gha,scope=builder-${{ runner.arch }}
+          cache-to: type=gha,mode=max,scope=builder-${{ runner.arch }}
+      - name: Install macOS build tools
+        if: ${{ !matrix.container }}
+        run: brew install autoconf automake cargo-c ccache cmake libtool meson nasm ninja pkg-config rust shaderc zstd
+      - name: Build in AlmaLinux 9
+        if: ${{ matrix.container }}
+        env:
+          FFMPEG_MT_SKIP_IMAGE_BUILD: "1"
+        run: >-
+          uv run python build.py ${{ matrix.target }} --clean
+          ${{ inputs.with_fdk_aac && '--with-fdk-aac' || '' }}
+      - name: Build on macOS
+        if: ${{ !matrix.container }}
+        run: >-
+          uv run python build.py ${{ matrix.target }} --clean
+          ${{ inputs.with_fdk_aac && '--with-fdk-aac' || '' }}
+      - name: Upload redistributable artifact
+        if: ${{ !inputs.with_fdk_aac }}
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: ffmpeg-${{ matrix.target }}
+          path: dist/*
+      - name: Upload private nonfree artifact
+        if: ${{ inputs.with_fdk_aac && github.event.repository.private }}
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: ffmpeg-${{ matrix.target }}-nonfree
+          path: dist/*
+
+  release:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release && !inputs.with_fdk_aac }}
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          pattern: ffmpeg-*
+          path: dist
+          merge-multiple: true
+      - run: uv run python scripts/source_archive.py
+      - name: Create versioned release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(uv run python -c 'import tomllib; print(tomllib.load(open("sources.lock.toml", "rb"))["sources"]["ffmpeg"]["version"])')
+          REVISION=$(uv run python -c 'import tomllib; print(tomllib.load(open("sources.lock.toml", "rb"))["build"]["revision"])')
+          TAG="v${VERSION}-r${REVISION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; nothing to publish."
+            exit 0
+          fi
+          gh release create "$TAG" dist/* --generate-notes

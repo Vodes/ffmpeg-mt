@@ -1,0 +1,572 @@
+# Every network input used by a release build is immutable and checksum-pinned.
+# Update this file with scripts/update_ffmpeg.py; build logic belongs in ffbuild/.
+
+[build]
+revision = 1
+
+[sources.ffmpeg]
+version = "9.0.2"
+url = "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz"
+sha256 = "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e"
+license = "GPL-3.0-or-later"
+license_files = ["COPYING.GPLv3", "LICENSE.md"]
+
+[sources.zlib]
+version = "1.3.1"
+url = "https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.xz"
+sha256 = "38ef96b8dfe510d42707d9c781877914792541133e1870841463bfa73f883e32"
+license = "Zlib"
+license_files = ["LICENSE"]
+
+[sources.expat]
+version = "2.7.1"
+url = "https://github.com/libexpat/libexpat/releases/download/R_2_7_1/expat-2.7.1.tar.xz"
+sha256 = "354552544b8f99012e5062f7d570ec77f14b412a3ff5c7d8d0dae62c0d217c30"
+license = "MIT"
+license_files = ["COPYING"]
+
+[sources.openssl]
+version = "3.5.7"
+url = "https://github.com/openssl/openssl/releases/download/openssl-3.5.7/openssl-3.5.7.tar.gz"
+sha256 = "a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8"
+license = "Apache-2.0"
+license_files = ["LICENSE.txt"]
+
+[sources.xz]
+version = "5.8.1"
+url = "https://github.com/tukaani-project/xz/releases/download/v5.8.1/xz-5.8.1.tar.xz"
+sha256 = "0b54f79df85912504de0b14aec7971e3f964491af1812d83447005807513cd9e"
+license = "0BSD AND GPL-2.0-or-later AND GPL-3.0-or-later"
+license_files = ["COPYING*", "LICENSE"]
+
+[sources.gmp]
+version = "6.3.0"
+url = "https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz"
+sha256 = "a3c2b80201b89e68616f4ad30bc66aee4927c3ce50e33929ca819d5c43538898"
+license = "LGPL-3.0-or-later OR GPL-2.0-or-later"
+license_files = ["COPYING*", "LICENSE"]
+
+[sources.unistring]
+version = "1.4.2"
+url = "https://ftp.gnu.org/gnu/libunistring/libunistring-1.4.2.tar.gz"
+sha256 = "e82664b170064e62331962126b259d452d53b227bb4a93ab20040d846fec01d8"
+license = "LGPL-3.0-or-later OR GPL-2.0-or-later"
+license_files = ["COPYING*"]
+
+[sources.nettle]
+version = "4.0"
+url = "https://ftp.gnu.org/gnu/nettle/nettle-4.0.tar.gz"
+sha256 = "3addbc00da01846b232fb3bc453538ea5468da43033f21bb345cb1e9073f5094"
+license = "LGPL-3.0-or-later OR GPL-2.0-or-later"
+license_files = ["COPYING*"]
+
+[sources.gnutls]
+version = "3.8.13"
+url = "https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.13.tar.xz"
+sha256 = "ffed8ec1bf09c2426d4f14aae377de4753b53e537d685e604e99a8b16ca9c97e"
+license = "LGPL-2.1-or-later"
+license_files = ["COPYING*", "LICENSE"]
+
+[sources.lamer]
+version = "3.101.0"
+url = "https://github.com/basswood-io/lamer/archive/refs/tags/v3.101.0.tar.gz"
+sha256 = "81839b16fdc401e20b73389d05f32a7656008f43bcb960feff290d6f08fc109e"
+license = "LGPL-2.0-or-later"
+license_files = ["COPYING", "LICENSE*"]
+
+[sources.opus]
+version = "1.6.1"
+url = "https://ftp.osuosl.org/pub/xiph/releases/opus/opus-1.6.1.tar.gz"
+sha256 = "6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1"
+license = "BSD-3-Clause"
+license_files = ["COPYING"]
+
+[sources.dav1d]
+version = "1.5.4"
+url = "https://code.videolan.org/videolan/dav1d/-/archive/1.5.4/dav1d-1.5.4.tar.bz2"
+sha256 = "2abfb0c89212e6e4733a54e0ae509ec00a5b845a6360946f918806e14aedb011"
+license = "BSD-2-Clause"
+license_files = ["COPYING"]
+
+[sources.svtav1]
+version = "4.2.0"
+url = "https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v4.2.0/SVT-AV1-v4.2.0.tar.bz2"
+sha256 = "512f2ea5649e3e76c2dddcc25c2556fb67a9582baaab207c9c96161c94659dad"
+license = "BSD-3-Clause"
+license_files = ["LICENSE*"]
+
+[sources.vpx]
+version = "1.17.0"
+url = "https://github.com/webmproject/libvpx/archive/refs/tags/v1.17.0.tar.gz"
+sha256 = "1020f184046187baa2985dbde38e0691f49c44088bca7a1842b0236c6081dc0a"
+license = "BSD-3-Clause"
+license_files = ["LICENSE"]
+
+[sources.png]
+version = "1.6.58"
+url = "https://downloads.sourceforge.net/project/libpng/libpng16/1.6.58/libpng-1.6.58.tar.xz"
+sha256 = "28eb403f51f0f7405249132cecfe82ea5c0ef97f1b32c5a65828814ae0d34775"
+license = "Libpng"
+license_files = ["LICENSE"]
+
+[sources.webp]
+version = "1.6.0"
+url = "https://github.com/webmproject/libwebp/archive/refs/tags/v1.6.0.tar.gz"
+sha256 = "93a852c2b3efafee3723efd4636de855b46f9fe1efddd607e1f42f60fc8f2136"
+license = "BSD-3-Clause"
+license_files = ["COPYING"]
+
+[sources.vmaf]
+version = "3.2.1"
+url = "https://github.com/Netflix/vmaf/archive/refs/tags/v3.2.1.tar.gz"
+sha256 = "5df7386911bc15fd1ca783132528748d219768ae4fc5f8e0b61184f041648092"
+license = "BSD-2-Clause-Patent"
+license_files = ["LICENSE"]
+
+[sources.x264]
+version = "b35605ace3ddf7c1a5d67a2eb553f034aef41d55"
+url = "https://code.videolan.org/videolan/x264/-/archive/b35605ace3ddf7c1a5d67a2eb553f034aef41d55/x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.bz2"
+sha256 = "6eeb82934e69fd51e043bd8c5b0d152839638d1ce7aa4eea65a3fedcf83ff224"
+license = "GPL-2.0-or-later"
+license_files = ["COPYING"]
+
+[sources.x265]
+version = "4.3"
+url = "https://github.com/Multicorewareinc/x265/releases/download/4.3/x265_4.3.tar.gz"
+sha256 = "83c53e4c8bbb8f1e33ed59e10a7d621d1d7801ca853910c3eb41f038b8ffb121"
+license = "GPL-2.0-or-later"
+license_files = ["COPYING"]
+
+[sources.nvcodec]
+version = "13.0.19.0"
+url = "https://github.com/FFmpeg/nv-codec-headers/archive/refs/tags/n13.0.19.0.tar.gz"
+sha256 = "86d15d1a7c0ac73a0eafdfc57bebfeba7da8264595bf531cf4d8db1c22940116"
+license = "MIT"
+license_files = ["LICENSE"]
+
+[sources.amf]
+version = "1.5.2"
+url = "https://github.com/GPUOpen-LibrariesAndSDKs/AMF/releases/download/v1.5.2/AMF-headers-v1.5.2.tar.gz"
+sha256 = "d3c12eb324edf05e214608b6a395a51dd95770ed9d45520185d6c3a206811c99"
+license = "MIT"
+license_files = ["LICENSE.txt"]
+
+[sources.vpl]
+version = "2.16.0"
+url = "https://github.com/intel/libvpl/archive/refs/tags/v2.16.0.tar.gz"
+sha256 = "d60931937426130ddad9f1975c010543f0da99e67edb1c6070656b7947f633b6"
+license = "MIT"
+license_files = ["LICENSE"]
+
+[sources.freetype]
+version = "2.13.3"
+url = "https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz"
+sha256 = "0550350666d427c74daeb85d5ac7bb353acba5f76956395995311a9c6f063289"
+license = "FTL OR GPL-2.0-or-later"
+license_files = ["LICENSE.TXT", "docs/FTL.TXT", "docs/GPLv2.TXT"]
+
+[sources.fontconfig]
+version = "2.16.0"
+url = "https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.16.0.tar.xz"
+sha256 = "6a33dc555cc9ba8b10caf7695878ef134eeb36d0af366041f639b1da9b6ed220"
+license = "MIT"
+license_files = ["COPYING"]
+
+[sources.harfbuzz]
+version = "11.2.1"
+url = "https://github.com/harfbuzz/harfbuzz/releases/download/11.2.1/harfbuzz-11.2.1.tar.xz"
+sha256 = "093714c8548a285094685f0bdc999e202d666b59eeb3df2ff921ab68b8336a49"
+license = "MIT"
+license_files = ["COPYING"]
+
+[sources.fribidi]
+version = "1.0.16"
+url = "https://github.com/fribidi/fribidi/releases/download/v1.0.16/fribidi-1.0.16.tar.xz"
+sha256 = "1b1cde5b235d40479e91be2f0e88a309e3214c8ab470ec8a2744d82a5a9ea05c"
+license = "LGPL-2.1-or-later"
+license_files = ["COPYING"]
+
+[sources.ass]
+version = "0.17.4"
+url = "https://github.com/libass/libass/releases/download/0.17.4/libass-0.17.4.tar.xz"
+sha256 = "78f1179b838d025e9c26e8fef33f8092f65611444ffa1bfc0cfac6a33511a05a"
+license = "ISC"
+license_files = ["COPYING"]
+
+[sources.aom]
+version = "3.12.1"
+url = "https://storage.googleapis.com/aom-releases/libaom-3.12.1.tar.gz"
+sha256 = "9e9775180dec7dfd61a79e00bda3809d43891aee6b2e331ff7f26986207ea22e"
+license = "BSD-2-Clause"
+license_files = ["LICENSE"]
+
+[sources.lc3]
+version = "1.1.3"
+url = "https://github.com/google/liblc3/archive/refs/tags/v1.1.3.tar.gz"
+sha256 = "276752ff54ce6a77d54ec133397b9d7e71f90caf3d9afa32d8b0e891b8ecb8af"
+license = "Apache-2.0"
+license_files = ["LICENSE"]
+
+[sources.mysofa]
+version = "1.3.2"
+url = "https://github.com/hoene/libmysofa/archive/refs/tags/v1.3.2.tar.gz"
+sha256 = "6c5224562895977e87698a64cb7031361803d136057bba35ed4979b69ab4ba76"
+license = "BSD-3-Clause"
+license_files = ["LICENSE"]
+
+[sources.qrencode]
+version = "4.1.1"
+url = "https://github.com/fukuchi/libqrencode/archive/refs/tags/v4.1.1.tar.gz"
+sha256 = "5385bc1b8c2f20f3b91d258bf8ccc8cf62023935df2d2676b5b67049f31a049c"
+license = "LGPL-2.1-or-later"
+license_files = ["COPYING"]
+
+[sources.quirc]
+version = "1.2"
+url = "https://github.com/dlbeer/quirc/archive/refs/tags/v1.2.tar.gz"
+sha256 = "73c12ea33d337ec38fb81218c7674f57dba7ec0570bddd5c7f7a977c0deb64c5"
+license = "ISC"
+license_files = ["LICENSE"]
+
+[sources.openjpeg]
+version = "2.5.3"
+url = "https://github.com/uclouvain/openjpeg/archive/refs/tags/v2.5.3.tar.gz"
+sha256 = "368fe0468228e767433c9ebdea82ad9d801a3ad1e4234421f352c8b06e7aa707"
+license = "BSD-2-Clause"
+license_files = ["LICENSE"]
+
+[sources.zimg]
+version = "3.0.6"
+url = "https://github.com/sekrit-twc/zimg/archive/refs/tags/release-3.0.6.tar.gz"
+sha256 = "be89390f13a5c9b2388ce0f44a5e89364a20c1c57ce46d382b1fcc3967057577"
+license = "WTFPL"
+license_files = ["COPYING"]
+
+[sources.placebo]
+version = "7.351.0"
+url = "https://code.videolan.org/videolan/libplacebo/-/archive/v7.351.0/libplacebo-v7.351.0.tar.bz2"
+sha256 = "d68159280842a7f0482dcea44a440f4c9a8e9403b82eccf185e46394dfc77e6a"
+license = "LGPL-2.1-or-later"
+license_files = ["LICENSE"]
+
+[sources.placebo_vulkan]
+version = "cacef3039d277c448c89336290ec3937270b0996"
+url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/cacef3039d277c448c89336290ec3937270b0996.tar.gz"
+sha256 = "400dc4bc49438f24ab9e90e6e587d9b1621a236f05eba80f6c048d7a1a96d353"
+license = "Apache-2.0 OR MIT"
+license_files = ["LICENSE.md"]
+
+[sources.placebo_fast_float]
+version = "1bf70101536d37fa9954cc4f03fd0903d045a9f3"
+url = "https://github.com/fastfloat/fast_float/archive/1bf70101536d37fa9954cc4f03fd0903d045a9f3.tar.gz"
+sha256 = "95c7730f3db8bfb8568e26387bed5df5284158c408d2c6411ed8ad4f5a6dc9ae"
+license = "Apache-2.0 OR BSL-1.0 OR MIT"
+license_files = ["LICENSE-*"]
+
+[sources.placebo_glad]
+version = "73db193f853e2ee079bf3ca8a64aa2eaf6459043"
+url = "https://github.com/Dav1dde/glad/archive/73db193f853e2ee079bf3ca8a64aa2eaf6459043.tar.gz"
+sha256 = "33dbeae44d8315ece57e14eba4b1b4a02ac5406d1c4f49cd20048c91522a6b9a"
+license = "MIT"
+license_files = ["LICENSE"]
+
+[sources.placebo_jinja]
+version = "15206881c006c79667fe5154fe80c01c65410679"
+url = "https://github.com/pallets/jinja/archive/15206881c006c79667fe5154fe80c01c65410679.tar.gz"
+sha256 = "b88a20dcc2e34072fcf4159325bc6c34cd4b29a81a8b83d15d2f28ba561da296"
+license = "BSD-3-Clause"
+license_files = ["LICENSE.txt"]
+
+[sources.placebo_markupsafe]
+version = "28ace20b140d15c083e1cbc163ee6b7778ba098c"
+url = "https://github.com/pallets/markupsafe/archive/28ace20b140d15c083e1cbc163ee6b7778ba098c.tar.gz"
+sha256 = "bead4c1f90f02956a082c6f026237e1e106a00636f4b26c3f16921631eb8737f"
+license = "BSD-3-Clause"
+license_files = ["LICENSE.txt"]
+
+[sources.sdl2]
+version = "2.32.8"
+url = "https://github.com/libsdl-org/SDL/releases/download/release-2.32.8/SDL2-2.32.8.tar.gz"
+sha256 = "0ca83e9c9b31e18288c7ec811108e58bac1f1bb5ec6577ad386830eac51c787e"
+license = "Zlib"
+license_files = ["LICENSE.txt"]
+
+[sources.srt]
+version = "1.5.4"
+url = "https://github.com/Haivision/srt/archive/refs/tags/v1.5.4.tar.gz"
+sha256 = "d0a8b600fe1b4eaaf6277530e3cfc8f15b8ce4035f16af4a5eb5d4b123640cdd"
+license = "MPL-2.0"
+license_files = ["LICENSE"]
+
+[sources.rist]
+version = "0.2.11"
+url = "https://code.videolan.org/rist/librist/-/archive/v0.2.11/librist-v0.2.11.tar.bz2"
+sha256 = "f254842900a9dd20fb477b05ea0cce3ec1a8004d85177eef2408eefddca68b86"
+license = "BSD-2-Clause"
+license_files = ["COPYING"]
+
+[sources.ssh]
+version = "0.11.3"
+url = "https://www.libssh.org/files/0.11/libssh-0.11.3.tar.xz"
+sha256 = "7d8a1361bb094ec3f511964e78a5a4dba689b5986e112afabe4f4d0d6c6125c3"
+license = "LGPL-2.1-or-later"
+license_files = ["COPYING"]
+
+[sources.curl]
+version = "8.14.1"
+url = "https://curl.se/download/curl-8.14.1.tar.xz"
+sha256 = "f4619a1e2474c4bbfedc88a7c2191209c8334b48fa1f4e53fd584cc12e9120dd"
+license = "curl"
+license_files = ["COPYING"]
+
+[sources.fdk_aac]
+version = "2.0.3"
+url = "https://github.com/mstorsjo/fdk-aac/archive/refs/tags/v2.0.3.tar.gz"
+sha256 = "e25671cd96b10bad896aa42ab91a695a9e573395262baed4e4a2ff178d6a3a78"
+license = "FDK-AAC"
+license_files = ["NOTICE", "LICENSE"]
+
+[sources.vulkan_headers]
+version = "1.4.321"
+url = "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/v1.4.321.tar.gz"
+sha256 = "7c1874f9186d9e7d5245e279cdccaa77a66ed8f52871b428630aeb771dc7623c"
+license = "Apache-2.0"
+license_files = ["LICENSE.md"]
+
+[sources.vulkan_loader]
+version = "1.4.321"
+url = "https://github.com/KhronosGroup/Vulkan-Loader/archive/refs/tags/v1.4.321.tar.gz"
+sha256 = "00669f6bb2db35c8df07f0b118c09bfe0ebffecaad7d80647a429eece0e37ac3"
+license = "Apache-2.0"
+license_files = ["LICENSE.txt"]
+
+[sources.opencl_headers]
+version = "2025.07.22"
+url = "https://github.com/KhronosGroup/OpenCL-Headers/archive/refs/tags/v2025.07.22.tar.gz"
+sha256 = "98f0a3ea26b4aec051e533cb1750db2998ab8e82eda97269ed6efe66ec94a240"
+license = "Apache-2.0"
+license_files = ["LICENSE"]
+
+[sources.opencl_loader]
+version = "2025.07.22"
+url = "https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/refs/tags/v2025.07.22.tar.gz"
+sha256 = "dff7a0b11ad5b63a669358e3476e3dc889a4a361674e5b69b267b944d0794142"
+license = "Apache-2.0"
+license_files = ["LICENSE"]
+
+[sources.libdrm]
+version = "2.4.125"
+url = "https://dri.freedesktop.org/libdrm/libdrm-2.4.125.tar.xz"
+sha256 = "d4bae92797a50f81a93524762e0410a49cd84cfa0f997795bc0172ac8fb1d96a"
+license = "MIT"
+license_files = ["LICENSE"]
+
+[sources.libva]
+version = "2.22.0"
+url = "https://github.com/intel/libva/archive/refs/tags/2.22.0.tar.gz"
+sha256 = "467c418c2640a178c6baad5be2e00d569842123763b80507721ab87eb7af8735"
+license = "MIT"
+license_files = ["COPYING"]
+
+[sources.implib]
+version = "a3e167cf978a5b8a38ec0f710d8c4331e8dcdd9a"
+url = "https://github.com/yugr/Implib.so/archive/a3e167cf978a5b8a38ec0f710d8c4331e8dcdd9a.tar.gz"
+sha256 = "c4fdcae8a6a7db45eb636e5b862be3da914e666d66a803944aedbeeefe0c70aa"
+license = "MIT"
+license_files = ["LICENSE.txt"]
+
+[sources.moltenvk]
+version = "1.4.2"
+url = "https://github.com/KhronosGroup/MoltenVK/releases/download/v1.4.2/MoltenVK-all.tar"
+sha256 = "562a15a29bc358446a56a4091c5f7e08f604184187c1d34f712148b61ef17276"
+license = "Apache-2.0"
+license_files = ["LICENSE"]
+
+[sources.moltenvk_source]
+version = "1.4.2"
+url = "https://github.com/KhronosGroup/MoltenVK/archive/refs/tags/v1.4.2.tar.gz"
+sha256 = "6864db532f1dbbdb621a8d0ec13f24edae318fd9269dd3dd0cdff791334bb1cb"
+license = "Apache-2.0"
+license_files = ["LICENSE"]
+
+[sources.llvm_mingw]
+version = "20260908"
+url = "https://github.com/mstorsjo/llvm-mingw/archive/refs/tags/20260908.tar.gz"
+sha256 = "6409ef0f7278489698477dd008418b91b62245995c5e2f3c6b22500ef95d42e2"
+license = "ISC AND Apache-2.0 WITH LLVM-exception"
+license_files = ["LICENSE.txt"]
+
+[sources.shaderc]
+version = "2026.2"
+url = "https://github.com/google/shaderc/archive/refs/tags/v2026.2.tar.gz"
+sha256 = "f924178e75e3293082481b25ed64d5e48a795b479dac3bd3c83d23070855df42"
+license = "Apache-2.0"
+license_files = ["LICENSE"]
+
+[sources.iconv]
+version = "1.18"
+url = "https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.18.tar.gz"
+sha256 = "3b08f5f4f9b4eb82f151a7040bfd6fe6c6fb922efe4b1659c66ea933276965e8"
+license = "LGPL-2.1-or-later"
+license_files = ["COPYING.LIB"]
+
+[sources.xml2]
+version = "c63248941708bc1d2e3a4292954593312212f6ca"
+url = "https://github.com/GNOME/libxml2/archive/c63248941708bc1d2e3a4292954593312212f6ca.tar.gz"
+sha256 = "585d62f8353fe8a6eb57254702fc3bd512d1ea9751539a53a75ab83a596c4361"
+license = "MIT"
+license_files = ["Copyright"]
+
+[sources.udfread]
+version = "0151d9d61e5f832664f502608d41a77c28846efa"
+url = "https://code.videolan.org/videolan/libudfread/-/archive/0151d9d61e5f832664f502608d41a77c28846efa/libudfread-0151d9d61e5f832664f502608d41a77c28846efa.tar.bz2"
+sha256 = "a9192ad298bbed4e3d1aa840bff81ad849134ce37b8e515f667c9b56405dc150"
+license = "LGPL-2.1-or-later"
+license_files = ["COPYING"]
+
+[sources.bluray]
+version = "065247e5ef40ccf39857db81e2c1368354a23ef8"
+url = "https://code.videolan.org/videolan/libbluray/-/archive/065247e5ef40ccf39857db81e2c1368354a23ef8/libbluray-065247e5ef40ccf39857db81e2c1368354a23ef8.tar.bz2"
+sha256 = "d5d816320580e7885ad65c59b2bc0da0344829853dbc149df12a7c10ef18689b"
+license = "LGPL-2.1-or-later"
+license_files = ["COPYING"]
+
+[sources.dvdcss]
+version = "811ce97a1d4d1c9d936f4b2707f533a9ef768251"
+url = "https://code.videolan.org/videolan/libdvdcss/-/archive/811ce97a1d4d1c9d936f4b2707f533a9ef768251/libdvdcss-811ce97a1d4d1c9d936f4b2707f533a9ef768251.tar.bz2"
+sha256 = "ce5846f8e7528ca0ed4eb74cbbcaf5a40eb312c9ccc801208694ddf7d47ef6ce"
+license = "GPL-2.0-or-later"
+license_files = ["COPYING"]
+
+[sources.dvdread]
+version = "ce9bdb7775601f4e6b95136b875bc72a53c5ba7d"
+url = "https://code.videolan.org/videolan/libdvdread/-/archive/ce9bdb7775601f4e6b95136b875bc72a53c5ba7d/libdvdread-ce9bdb7775601f4e6b95136b875bc72a53c5ba7d.tar.bz2"
+sha256 = "6dac673043b0be7ee5b8696394dc946466f626dc3b4814fff5ab491c67ec7ed1"
+license = "GPL-2.0-or-later"
+license_files = ["COPYING"]
+
+[sources.dvdnav]
+version = "2ffc50b5c37a6ddc086829203fc44e95588198dd"
+url = "https://code.videolan.org/videolan/libdvdnav/-/archive/2ffc50b5c37a6ddc086829203fc44e95588198dd/libdvdnav-2ffc50b5c37a6ddc086829203fc44e95588198dd.tar.bz2"
+sha256 = "6a4812886e919e80ca3842537bde15a74ab0314dbe9ec613e3b0bb5ceccd885a"
+license = "GPL-2.0-or-later"
+license_files = ["COPYING"]
+
+[sources.aribcaption]
+version = "c64c23b8905ba514b87c9789269e9f66f949ffe0"
+url = "https://github.com/xqq/libaribcaption/archive/c64c23b8905ba514b87c9789269e9f66f949ffe0.tar.gz"
+sha256 = "9f91ac8f677fb8b1a9a27a792f3bf0b3b8b5348f13a0c07d372d496e6cde9e6a"
+license = "MIT"
+license_files = ["LICENSE"]
+
+[sources.openal]
+version = "c157b87cb9eb58d747748e49f82ee4a64d1dcf8b"
+url = "https://github.com/kcat/openal-soft/archive/c157b87cb9eb58d747748e49f82ee4a64d1dcf8b.tar.gz"
+sha256 = "3f0ed61cfd56d1e5d50a8ccac00af4970fdec07a80f311c3e24eac8c2f40e612"
+license = "LGPL-2.0-or-later"
+license_files = ["COPYING"]
+
+[sources.rubberband]
+version = "e4296ac80b1170018a110bc326fd0d45a0eb27d6"
+url = "https://github.com/breakfastquay/rubberband/archive/e4296ac80b1170018a110bc326fd0d45a0eb27d6.tar.gz"
+sha256 = "32770ab6a395badb6a5ee3443bf5a0cfd5cac07f332af8e03fd6dcd61f5b3759"
+license = "GPL-2.0-or-later"
+license_files = ["COPYING"]
+
+[sources.soxr]
+version = "0.1.3"
+url = "https://downloads.sourceforge.net/project/soxr/soxr-0.1.3-Source.tar.xz"
+sha256 = "b111c15fdc8c029989330ff559184198c161100a59312f5dc19ddeb9b5a15889"
+license = "LGPL-2.1-or-later"
+license_files = ["COPYING.LGPL"]
+
+[sources.lv2]
+version = "3c57dae600a5ad8d05acd53ee3490f7d91cb7be6"
+url = "https://github.com/lv2/lv2/archive/3c57dae600a5ad8d05acd53ee3490f7d91cb7be6.tar.gz"
+sha256 = "4769e649aabf1774aaf2cb4dede19ae2463ded0e94cd3cc3af81403992398457"
+license = "ISC"
+license_files = ["COPYING"]
+
+[sources.zix]
+version = "17d632393f5addb6fa24dda2927b96515407cca7"
+url = "https://github.com/drobilla/zix/archive/17d632393f5addb6fa24dda2927b96515407cca7.tar.gz"
+sha256 = "a1b95d6eb32a00f881f620edcab9d27335250e37c6ad879feb0c29a7fc2c02e5"
+license = "ISC"
+license_files = ["COPYING"]
+
+[sources.serd]
+version = "b6053bb2a4533e6a8e3821c1061f140d5e666938"
+url = "https://github.com/drobilla/serd/archive/b6053bb2a4533e6a8e3821c1061f140d5e666938.tar.gz"
+sha256 = "bb3ed8dd1948d22da3c71e4a083ffb071a8ab70452b188d6cc3fb5ec3abeca9b"
+license = "ISC"
+license_files = ["COPYING"]
+
+[sources.sord]
+version = "4b5232bb91e7f2f1b84df384494d073fabbcd312"
+url = "https://github.com/drobilla/sord/archive/4b5232bb91e7f2f1b84df384494d073fabbcd312.tar.gz"
+sha256 = "b5a1d3a34d7b177fd33f4ac7f96c3904861b2c6cf9b3039cb6856f6cb9abb995"
+license = "ISC"
+license_files = ["COPYING"]
+
+[sources.sratom]
+version = "9e8ee84eed502e6030ce8bb49694fd28542b08fc"
+url = "https://github.com/lv2/sratom/archive/9e8ee84eed502e6030ce8bb49694fd28542b08fc.tar.gz"
+sha256 = "7a1785d825e6d1d60f11c7371a0a5fc8a6d66f407eddf9d37eb50dd87afe274f"
+license = "ISC"
+license_files = ["COPYING"]
+
+[sources.lilv]
+version = "4b8f30055fa5cb4134a2eb45fc1555bc04289314"
+url = "https://github.com/lv2/lilv/archive/4b8f30055fa5cb4134a2eb45fc1555bc04289314.tar.gz"
+sha256 = "37c5df93860082273ab02104556b45625303a04a299d2914f5dd215f39a29409"
+license = "ISC"
+license_files = ["COPYING"]
+
+[sources.ffi]
+version = "3.5.2"
+url = "https://github.com/libffi/libffi/releases/download/v3.5.2/libffi-3.5.2.tar.gz"
+sha256 = "f3a3082a23b37c293a4fcd1053147b371f2ff91fa7ea1b2a52e335676bac82dc"
+license = "MIT"
+license_files = ["LICENSE"]
+
+[sources.pcre2]
+version = "10.46"
+url = "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.46/pcre2-10.46.tar.bz2"
+sha256 = "15fbc5aba6beee0b17aecb04602ae39432393aba1ebd8e39b7cabf7db883299f"
+license = "BSD-3-Clause"
+license_files = ["LICENCE.md"]
+
+[sources.glib]
+version = "2.84.3"
+url = "https://download.gnome.org/sources/glib/2.84/glib-2.84.3.tar.xz"
+sha256 = "aa4f87c3225bf57ca85f320888f7484901a17934ca37023c3bd8435a72db863e"
+license = "LGPL-2.1-or-later"
+license_files = ["COPYING"]
+
+[sources.pixman]
+version = "0.46.4"
+url = "https://www.cairographics.org/releases/pixman-0.46.4.tar.xz"
+sha256 = "a098c33924754ad43f981b740f6d576c70f9ed1006e12221b1845431ebce1239"
+license = "MIT"
+license_files = ["COPYING"]
+
+[sources.cairo]
+version = "1.18.4"
+url = "https://www.cairographics.org/releases/cairo-1.18.4.tar.xz"
+sha256 = "445ed8208a6e4823de1226a74ca319d3600e83f6369f99b14265006599c32ccb"
+license = "LGPL-2.1-only OR MPL-1.1"
+license_files = ["COPYING", "COPYING-LGPL-2.1", "COPYING-MPL-1.1"]
+
+[sources.pango]
+version = "1.56.4"
+url = "https://download.gnome.org/sources/pango/1.56/pango-1.56.4.tar.xz"
+sha256 = "17065e2fcc5f5a5bdbffc884c956bfc7c451a96e8c4fb2f8ad837c6413cb5a01"
+license = "LGPL-2.1-or-later"
+license_files = ["COPYING"]
+
+[sources.rsvg]
+version = "2.61.1"
+url = "https://download.gnome.org/sources/librsvg/2.61/librsvg-2.61.1.tar.xz"
+sha256 = "bc1bbcd419120b098db28bea55335d9de2470d4e6a9f6ee97207b410fc15867d"
+license = "LGPL-2.1-or-later"
+license_files = ["COPYING.LIB", "vendor/*/LICENSE*"]

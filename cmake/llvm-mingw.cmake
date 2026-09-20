@@ -1,0 +1,28 @@
+set(CMAKE_SYSTEM_NAME Windows)
+
+if(NOT DEFINED ENV{FFMPEG_MT_TARGET})
+  message(FATAL_ERROR "FFMPEG_MT_TARGET is not set")
+endif()
+
+if("$ENV{FFMPEG_MT_TARGET}" STREQUAL "windows-x86_64")
+  set(_triple x86_64-w64-mingw32)
+  set(CMAKE_SYSTEM_PROCESSOR AMD64)
+elseif("$ENV{FFMPEG_MT_TARGET}" STREQUAL "windows-arm64")
+  set(_triple aarch64-w64-mingw32)
+  set(CMAKE_SYSTEM_PROCESSOR ARM64)
+else()
+  message(FATAL_ERROR "Unsupported Windows target: $ENV{FFMPEG_MT_TARGET}")
+endif()
+
+set(_root "$ENV{LLVM_MINGW_ROOT}")
+set(CMAKE_C_COMPILER "${_root}/bin/${_triple}-clang")
+set(CMAKE_CXX_COMPILER "${_root}/bin/${_triple}-clang++")
+set(CMAKE_AR "${_root}/bin/${_triple}-ar")
+set(CMAKE_RANLIB "${_root}/bin/${_triple}-ranlib")
+set(CMAKE_RC_COMPILER "${_root}/bin/${_triple}-windres")
+set(CMAKE_FIND_ROOT_PATH "${_root}/${_triple}" "$ENV{FFMPEG_MT_PREFIX}")
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+
