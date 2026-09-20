@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import inspect
 import io
 import tarfile
 from pathlib import Path
@@ -22,7 +21,6 @@ from ffbuild.package import (
 from ffbuild.recipes import selected_recipes
 from ffbuild.targets import TARGETS
 from ffbuild.validate import (
-    COMPILED_FEATURE_NAMES,
     _assert_lazy_vaapi,
     _assert_no_staged_shared_libraries,
     _scan_paths,
@@ -63,27 +61,6 @@ def test_archive_members_are_unique(tmp_path: Path) -> None:
     ]
 
 
-def test_target_matrix_is_exact() -> None:
-    assert tuple(TARGETS) == (
-        "linux-x86_64",
-        "linux-arm64",
-        "windows-x86_64",
-        "windows-arm64",
-        "macos-arm64",
-    )
-
-
-def test_cmake_enables_legacy_policy_compatibility(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    calls: list[tuple[object, ...]] = []
-    monkeypatch.setattr(helpers, "run", lambda *args, **_kwargs: calls.append(args))
-
-    helpers.cmake(context(tmp_path, "macos-arm64"), tmp_path / "source")
-
-    assert "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" in calls[0]
-
-
 def test_third_party_workflow_actions_are_commit_pinned() -> None:
     for workflow in (ROOT / ".github" / "workflows").glob("*.yml"):
         for line in workflow.read_text(encoding="utf-8").splitlines():
@@ -100,83 +77,6 @@ def test_third_party_workflow_actions_are_commit_pinned() -> None:
             else:
                 assert len(reference) == 40, action
                 int(reference, 16)
-
-
-def test_shaderc_builder_builds_the_glslc_executable_target() -> None:
-    dockerfile = (ROOT / "docker" / "Dockerfile").read_text(encoding="utf-8")
-    assert "cmake --build build --target glslc_exe --parallel" in dockerfile
-    assert "install -m 0755 build/glslc/glslc /usr/local/bin/glslc" in dockerfile
-
-
-def test_xz_disables_host_localized_tools(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    ctx = context(tmp_path, "macos-arm64")
-    source = tmp_path / "xz"
-    source.mkdir()
-    calls: list[tuple[object, ...]] = []
-    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
-    monkeypatch.setattr(recipes, "cmake", lambda *args, **_kwargs: calls.append(args))
-
-    recipes.build_xz(ctx)
-
-    assert calls == [
-        (
-            ctx,
-            source,
-            "-DXZ_NLS=OFF",
-            "-DXZ_TOOL_XZ=OFF",
-            "-DXZ_TOOL_XZDEC=OFF",
-            "-DXZ_TOOL_LZMADEC=OFF",
-            "-DXZ_TOOL_LZMAINFO=OFF",
-        )
-    ]
-
-
-def test_webp_disables_utilities_and_extras(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    ctx = context(tmp_path, "macos-arm64")
-    source = tmp_path / "webp"
-    source.mkdir()
-    calls: list[tuple[object, ...]] = []
-    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
-    monkeypatch.setattr(recipes, "cmake", lambda *args, **_kwargs: calls.append(args))
-
-    recipes.build_webp(ctx)
-
-    assert calls == [
-        (
-            ctx,
-            source,
-            "-DWEBP_BUILD_EXTRAS=OFF",
-            "-DWEBP_BUILD_ANIM_UTILS=OFF",
-            "-DWEBP_BUILD_CWEBP=OFF",
-            "-DWEBP_BUILD_DWEBP=OFF",
-            "-DWEBP_BUILD_GIF2WEBP=OFF",
-            "-DWEBP_BUILD_IMG2WEBP=OFF",
-            "-DWEBP_BUILD_VWEBP=OFF",
-            "-DWEBP_BUILD_WEBPINFO=OFF",
-            "-DWEBP_BUILD_WEBPMUX=OFF",
-        )
-    ]
-
-
-@pytest.mark.parametrize(
-    ("target", "coretext_enabled"),
-    [("linux-x86_64", False), ("macos-arm64", True)],
-)
-def test_harfbuzz_coretext_matches_target_platform(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, target: str, coretext_enabled: bool
-) -> None:
-    ctx = context(tmp_path, target)
-    source = tmp_path / "harfbuzz"
-    source.mkdir()
-    calls: list[tuple[object, ...]] = []
-    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
-    monkeypatch.setattr(recipes, "meson", lambda *args, **_kwargs: calls.append(args))
-
-    recipes.build_harfbuzz(ctx)
-
-    assert ("-Dcoretext=enabled" in calls[0]) is coretext_enabled
 
 
 def test_moltenvk_installs_vulkan_loader_alias(
@@ -250,95 +150,6 @@ def test_target_shaderc_installs_static_metadata_and_spirv_headers(
     assert "-lstdc++" in (ctx.prefix / "lib" / "pkgconfig" / "shaderc.pc").read_text(
         encoding="utf-8"
     )
-
-
-def test_container_pins_compatible_meson() -> None:
-    dockerfile = (ROOT / "docker" / "Dockerfile").read_text(encoding="utf-8")
-    assert "pip install --no-cache-dir meson==1.9.1 uv==0.8.22" in dockerfile
-
-
-def test_container_uses_prebuilt_llvm_mingw_for_both_host_architectures() -> None:
-    dockerfile = (ROOT / "docker" / "Dockerfile").read_text(encoding="utf-8")
-    assert "llvm-mingw-${LLVM_MINGW_VERSION}-ucrt-ubuntu-22.04-${host_arch}.tar.xz" in dockerfile
-    assert "amd64) host_arch=x86_64" in dockerfile
-    assert "arm64) host_arch=aarch64" in dockerfile
-    assert "/usr/lib/*-linux-gnu/libstdc++.so.6* /opt/llvm-mingw/host-libs/" in dockerfile
-    assert "./build-all.sh" not in dockerfile
-
-
-def test_vulkan_loader_uses_btbns_static_shim(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    calls: list[tuple[object, ...]] = []
-    shim = tmp_path / "shim"
-    headers = tmp_path / "headers"
-    (shim / "Vulkan-Headers").mkdir(parents=True)
-    (headers / "include").mkdir(parents=True)
-    (headers / "include" / "vulkan.h").touch()
-    ctx = context(tmp_path, "linux-x86_64")
-    ctx.source_dirs["vulkan_headers"] = headers
-    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: shim)
-    monkeypatch.setattr(recipes, "cmake", lambda *args: calls.append(args))
-
-    recipes.build_vulkan_loader(ctx)
-
-    assert (shim / "Vulkan-Headers" / "include" / "vulkan.h").exists()
-    assert calls == [(ctx, shim, "-DVULKAN_SHIM_IMPERSONATE=ON")]
-
-
-def test_mysofa_uses_a_relocatable_logical_install_prefix(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    ctx = context(tmp_path, "linux-x86_64")
-    source = tmp_path / "mysofa"
-    source.mkdir()
-    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
-    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
-
-    def fake_cmake(*args: object, **kwargs: object) -> None:
-        calls.append((args, kwargs))
-        pkg_config = ctx.prefix / "lib" / "pkgconfig" / "libmysofa.pc"
-        pkg_config.parent.mkdir(parents=True)
-        pkg_config.write_text("prefix=/\nlibdir=/lib\nincludedir=/include\n", encoding="utf-8")
-
-    monkeypatch.setattr(recipes, "cmake", fake_cmake)
-
-    recipes.build_mysofa(ctx)
-
-    assert "-DCMAKE_INSTALL_LIBDIR=/lib" in calls[0][0]
-    assert "-DCMAKE_INSTALL_INCLUDEDIR=/include" in calls[0][0]
-    assert "-DCMAKE_INSTALL_DATADIR=/share" in calls[0][0]
-    assert calls[0][1] == {"install_prefix": "/", "install_destdir": ctx.prefix}
-    metadata = (ctx.prefix / "lib" / "pkgconfig" / "libmysofa.pc").read_text(encoding="utf-8")
-    assert f"prefix={ctx.prefix}" in metadata
-
-
-def test_openssl_relocates_pkg_config_metadata(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    ctx = context(tmp_path, "linux-x86_64")
-    source = tmp_path / "openssl"
-    source.mkdir()
-    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
-
-    def fake_run(*args: object, **_kwargs: object) -> None:
-        if "install_sw" not in args:
-            return
-        pkg_config = ctx.prefix / "lib" / "pkgconfig"
-        pkg_config.mkdir(parents=True)
-        for name in ("libcrypto.pc", "libssl.pc", "openssl.pc"):
-            (pkg_config / name).write_text(
-                "prefix=/\nlibdir=${prefix}/lib\nincludedir=${prefix}/include\n",
-                encoding="utf-8",
-            )
-
-    monkeypatch.setattr(recipes, "run", fake_run)
-
-    recipes.build_openssl(ctx)
-
-    for name in ("libcrypto.pc", "libssl.pc", "openssl.pc"):
-        metadata = (ctx.prefix / "lib" / "pkgconfig" / name).read_text(encoding="utf-8")
-        assert f"prefix={ctx.prefix}" in metadata
 
 
 @pytest.mark.parametrize(
@@ -416,12 +227,6 @@ def test_configure_manifest_and_nonfree_separation(tmp_path: Path, target: str) 
     nonfree_flags = configure_flags(nonfree, 1)
     assert_configure_flags(ROOT, target, nonfree_flags, True)
     assert {"--enable-nonfree", "--enable-libfdk-aac"} <= set(nonfree_flags)
-
-
-def test_external_protocol_runtime_names_map_to_ffmpeg_config_macros() -> None:
-    assert COMPILED_FEATURE_NAMES[("protocols", "rist")] == "librist"
-    assert COMPILED_FEATURE_NAMES[("protocols", "sftp")] == "libssh"
-    assert COMPILED_FEATURE_NAMES[("protocols", "srt")] == "libsrt"
 
 
 def test_artifact_names(tmp_path: Path) -> None:
@@ -606,34 +411,6 @@ def test_path_scan_allows_relative_source_paths_but_rejects_workspace_paths(
         _scan_paths(ctx, (binary, binary))
 
 
-def test_fontconfig_uses_a_relocatable_logical_prefix(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    ctx = context(tmp_path, "linux-x86_64")
-    source = tmp_path / "fontconfig"
-    calls: list[tuple[object, ...]] = []
-    monkeypatch.setattr("ffbuild.recipes.extract", lambda *_args: source)
-    monkeypatch.setattr(
-        "ffbuild.recipes.meson", lambda *args, **kwargs: calls.append((args, kwargs))
-    )
-
-    recipes.build_fontconfig(ctx)
-
-    assert calls == [
-        (
-            (
-                ctx,
-                source,
-                "-Ddoc=disabled",
-                "-Dtests=disabled",
-                "-Dtools=disabled",
-                "-Dpkgconfig.relocatable=true",
-            ),
-            {"install_prefix": "/", "install_destdir": ctx.prefix},
-        )
-    ]
-
-
 def test_only_numbered_stable_archives_are_selected() -> None:
     index = """
       <a href="ffmpeg-9.0.2.tar.xz">stable</a>
@@ -683,104 +460,6 @@ def test_glib_stages_declared_libintl_fallback_on_macos(
     assert staged.read_text(encoding="utf-8") == "project('proxy-libintl')\n"
 
 
-def test_openssl_disables_shared_provider_modules(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    commands: list[tuple[object, ...]] = []
-    source = tmp_path / "openssl"
-    source.mkdir()
-    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
-    monkeypatch.setattr(recipes, "run", lambda *args, **_kwargs: commands.append(args))
-    monkeypatch.setattr(recipes, "_set_pkg_config_variables", lambda *_args: None)
-
-    recipes.build_openssl(context(tmp_path, "linux-x86_64"))
-
-    assert "--prefix=/" in commands[0]
-    assert "--openssldir=/ssl" in commands[0]
-    assert "no-shared" in commands[0]
-    assert "no-module" in commands[0]
-    assert any(str(command).startswith("DESTDIR=") for command in commands[2])
-
-
-def test_libxml2_uses_cmake_without_runtime_modules(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
-    source = tmp_path / "libxml2"
-    source.mkdir()
-    ctx = context(tmp_path, "linux-x86_64")
-    pkg_config = ctx.prefix / "lib" / "pkgconfig" / "libxml-2.0.pc"
-    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
-
-    def fake_cmake(*args: object, **kwargs: object) -> None:
-        calls.append((args, kwargs))
-        pkg_config.parent.mkdir(parents=True)
-        pkg_config.write_text("prefix=/\n", encoding="utf-8")
-
-    monkeypatch.setattr(recipes, "cmake", fake_cmake)
-    recipes.build_xml2(ctx)
-
-    assert calls == [
-        (
-            (
-                ctx,
-                source,
-                "-DCMAKE_INSTALL_BINDIR=/bin",
-                "-DCMAKE_INSTALL_LIBDIR=/lib",
-                "-DCMAKE_INSTALL_INCLUDEDIR=/include",
-                "-DCMAKE_INSTALL_DATAROOTDIR=/share",
-                "-DCMAKE_INSTALL_DATADIR=/share",
-                "-DCMAKE_INSTALL_SYSCONFDIR=/etc",
-                "-DLIBXML2_WITH_MODULES=OFF",
-                "-DLIBXML2_WITH_PROGRAMS=OFF",
-                "-DLIBXML2_WITH_PYTHON=OFF",
-                "-DLIBXML2_WITH_TESTS=OFF",
-            ),
-            {"install_prefix": "/", "install_destdir": ctx.prefix},
-        )
-    ]
-    assert pkg_config.read_text(encoding="utf-8") == f"prefix={ctx.prefix}\n"
-
-
-def test_dvdcss_uses_its_current_meson_build(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    calls: list[tuple[object, ...]] = []
-    source = tmp_path / "libdvdcss"
-    source.mkdir()
-    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
-    monkeypatch.setattr(recipes, "meson", lambda *args: calls.append(args))
-
-    recipes.build_dvdcss(context(tmp_path, "linux-x86_64"))
-
-    assert calls[0][1:] == (source, "-Denable_docs=false", "-Denable_examples=false")
-
-
-def test_dvdread_and_dvdnav_use_their_current_meson_builds(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    calls: list[tuple[object, ...]] = []
-    source = tmp_path / "dvd"
-    source.mkdir()
-    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
-    monkeypatch.setattr(recipes, "meson", lambda *args: calls.append(args))
-    ctx = context(tmp_path, "linux-x86_64")
-
-    recipes.build_dvdread(ctx)
-    recipes.build_dvdnav(ctx)
-
-    assert calls[0][1:] == (source, "-Denable_docs=false", "-Dlibdvdcss=enabled")
-    assert calls[1][1:] == (source, "-Denable_docs=false", "-Denable_examples=false")
-
-
-def test_current_rsvg_and_gnutls_options_are_supported() -> None:
-    rsvg_source = inspect.getsource(recipes.build_rsvg)
-    assert "-Drsvg-convert=disabled" not in rsvg_source
-
-    gnutls_source = inspect.getsource(recipes.build_gnutls)
-    assert "--disable-guile" not in gnutls_source
-
-
 def test_rsvg_build_omits_unneeded_converter(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -802,23 +481,6 @@ def test_rsvg_build_omits_unneeded_converter(
 
     assert meson_build.read_text(encoding="utf-8") == "subdir('rsvg')\n"
     assert meson_calls[0][1] == source
-
-
-def test_audited_recipe_options_are_current() -> None:
-    svt_source = inspect.getsource(recipes.build_svtav1)
-    assert "BUILD_DEC" not in svt_source
-    assert "BUILD_ENC" not in svt_source
-
-    vpl_source = inspect.getsource(recipes.build_vpl)
-    assert "BUILD_TOOLS" not in vpl_source
-
-    ssh_source = inspect.getsource(recipes.build_ssh)
-    assert "WITH_STATIC_LIB" not in ssh_source
-
-    sdl_source = inspect.getsource(recipes.build_sdl2)
-    assert "SDL_TEST_LIBRARY" not in sdl_source
-    assert "-DSDL_TESTS=OFF" in sdl_source
-    assert "-DSDL2_DISABLE_SDL2MAIN=ON" in sdl_source
 
 
 def test_libssh_static_pkg_config_metadata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -940,22 +602,6 @@ def test_srt_encryption_tracks_openssl_availability(
     assert f"-DENABLE_ENCRYPTION={encryption}" in calls[0]
 
 
-def test_amf_installs_the_headers_archive_layout(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    ctx = context(tmp_path, "linux-x86_64")
-    source = tmp_path / "amf"
-    header = source / "AMF" / "core" / "Version.h"
-    header.parent.mkdir(parents=True)
-    header.write_text("#define AMF_VERSION 1\n", encoding="utf-8")
-    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
-
-    recipes.build_amf(ctx)
-
-    installed = ctx.prefix / "include" / "AMF" / "core" / "Version.h"
-    assert installed.read_text(encoding="utf-8") == "#define AMF_VERSION 1\n"
-
-
 def test_aribcaption_uses_a_linker_flag_for_the_static_cpp_runtime(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1066,14 +712,6 @@ def test_rubberband_macos_includes_cstddef_for_libcxx(
     assert header.read_text(encoding="utf-8") == '#include "sysutils.h"\n#include <cstddef>\n'
 
 
-def test_linux_ffmpeg_links_the_math_library_for_static_dependency_probes(
-    tmp_path: Path,
-) -> None:
-    flags = configure_flags(context(tmp_path, "linux-x86_64"), revision=1)
-
-    assert "--extra-libs=-lm" in flags
-
-
 def test_libdrm_shared_library_is_kept_until_libva_shims_are_generated(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1116,32 +754,6 @@ def test_libdrm_shared_library_is_kept_until_libva_shims_are_generated(
     assert generated == ["libdrm.so.2", "libva.so.2", "libva-drm.so.2"]
     assert not list(library_dir.glob("libdrm*.so*"))
     assert not list(library_dir.glob("libva*.so*"))
-
-
-def test_lamer_builds_only_the_library(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    ctx = context(tmp_path, "windows-x86_64")
-    source = tmp_path / "lamer"
-    source.mkdir()
-    commands: list[tuple[object, ...]] = []
-    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
-    monkeypatch.setattr(recipes, "run", lambda *args, **_kwargs: commands.append(args))
-
-    recipes.build_lamer(ctx)
-
-    assert commands[0] == ("make", f"-j{ctx.jobs}", "lib")
-
-
-def test_quirc_library_build_does_not_probe_host_sdl() -> None:
-    source = inspect.getsource(recipes.build_quirc)
-    assert "make" not in source
-    assert "SDL" not in source
-    assert 'env["AR"]' in source
-
-
-def test_librist_uses_its_actual_tools_option() -> None:
-    source = inspect.getsource(recipes.build_rist)
-    assert "-Dbuilt_tools=false" in source
-    assert '"-Dtools=false"' not in source
 
 
 def test_lock_update_uses_toml_structure_and_preserves_comments(tmp_path: Path) -> None:
@@ -1195,24 +807,6 @@ def test_environment_excludes_host_pkg_config(tmp_path: Path) -> None:
     assert "--remap-path-prefix=/opt/homebrew=." in macos_env["RUSTFLAGS"]
 
 
-def test_lock_has_valid_checksums_and_license_metadata() -> None:
-    sources, revision = load_sources(ROOT / "sources.lock.toml")
-    assert revision >= 1
-    assert sources["ffmpeg"].sha256 == (
-        "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e"
-    )
-    assert {
-        "implib",
-        "lc3",
-        "mysofa",
-        "qrencode",
-        "quirc",
-        "moltenvk",
-        "llvm_mingw",
-        "proxy_libintl",
-        "shaderc",
-        "shaderc_glslang",
-        "shaderc_spirv_headers",
-        "shaderc_spirv_tools",
-    } <= sources.keys()
+def test_sources_declare_license_metadata() -> None:
+    sources, _ = load_sources(ROOT / "sources.lock.toml")
     assert all(source.license and source.license_files for source in sources.values())

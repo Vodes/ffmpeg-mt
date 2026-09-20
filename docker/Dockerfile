@@ -34,7 +34,7 @@ RUN curl -fL --retry 5 \
 
 FROM shader_tools AS base_builder
 
-RUN python3.12 -m pip install --no-cache-dir meson==1.9.1 uv==0.8.22
+RUN python3.12 -m pip install --no-cache-dir uv==0.8.22
 
 WORKDIR /src
 
@@ -68,3 +68,5 @@ COPY --from=llvm_mingw_runtime \
 ENV LLVM_MINGW_ROOT=/opt/llvm-mingw
 ENV PATH=/opt/llvm-mingw/bin:/root/.local/bin:${PATH}
 ENV LD_LIBRARY_PATH=/opt/llvm-mingw/host-libs:${LD_LIBRARY_PATH}
+
+WORKDIR /src
