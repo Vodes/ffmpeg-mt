@@ -62,6 +62,8 @@ RUN case "${TARGETARCH}" in \
     tar -xJf "${archive}" --strip-components=1 -C /opt/llvm-mingw && \
     rm -rf /tmp/llvm-mingw
 
+RUN ln -s windows.h /opt/llvm-mingw/generic-w64-mingw32/include/Windows.h
+
 COPY --from=llvm_mingw_runtime \
     /usr/lib/*-linux-gnu/libstdc++.so.6* /opt/llvm-mingw/host-libs/
 
