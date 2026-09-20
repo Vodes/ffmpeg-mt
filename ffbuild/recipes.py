@@ -823,16 +823,9 @@ def build_webp(ctx: BuildContext) -> None:
 
 
 def build_vmaf(ctx: BuildContext) -> None:
-    source = extract(ctx, "vmaf") / "libvmaf"
-    if ctx.target.windows:
-        svm_source = source / "src" / "svm.cpp"
-        svm_text = svm_source.read_text(encoding="utf-8")
-        if "template <class T> static inline void swap(" not in svm_text:
-            raise ValueError("vmaf: expected libsvm swap helper was not found")
-        svm_source.write_text(svm_text.replace("swap(", "svm_swap("), encoding="utf-8")
     meson(
         ctx,
-        source,
+        extract(ctx, "vmaf") / "libvmaf",
         "-Denable_tests=false",
         "-Denable_docs=false",
         "-Denable_tools=false",

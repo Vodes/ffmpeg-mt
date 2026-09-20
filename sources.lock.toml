@@ -361,9 +361,9 @@ license = "Apache-2.0"
 license_files = ["LICENSE"]
 
 [sources.llvm_mingw]
-version = "20260908"
-url = "https://github.com/mstorsjo/llvm-mingw/archive/refs/tags/20260908.tar.gz"
-sha256 = "6409ef0f7278489698477dd008418b91b62245995c5e2f3c6b22500ef95d42e2"
+version = "20260616"
+url = "https://github.com/mstorsjo/llvm-mingw/archive/refs/tags/20260616.tar.gz"
+sha256 = "998ae3be76fd3507793d954068f46faed2998df5b5789983038b79ee8b20efef"
 license = "ISC AND Apache-2.0 WITH LLVM-exception"
 license_files = ["LICENSE.txt"]
 
