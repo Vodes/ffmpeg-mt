@@ -36,7 +36,12 @@ def _normalise(info: tarfile.TarInfo) -> tarfile.TarInfo:
 def _write_tar(source: Path, destination: Path) -> None:
     with tarfile.open(destination, "w") as archive:
         for path in sorted(source.rglob("*"), key=lambda item: item.as_posix()):
-            archive.add(path, arcname=path.relative_to(source.parent), filter=_normalise)
+            archive.add(
+                path,
+                arcname=path.relative_to(source.parent),
+                filter=_normalise,
+                recursive=False,
+            )
 
 
 def package(ctx: BuildContext, revision: int, flags: list[str]) -> Path:
@@ -56,9 +61,13 @@ def package(ctx: BuildContext, revision: int, flags: list[str]) -> Path:
         included = set(ctx.source_dirs)
         for source_name in sorted(included):
             source_info = ctx.sources[source_name]
-            copy_license_files(
-                ctx.source_dirs[source_name], source_info.license_files, notices / source_name
-            )
+            bundled_notice = ctx.root / "notices" / source_name
+            if bundled_notice.is_dir():
+                shutil.copytree(bundled_notice, notices / source_name)
+            else:
+                copy_license_files(
+                    ctx.source_dirs[source_name], source_info.license_files, notices / source_name
+                )
         if "rsvg" in included:
             lock_dir = staging / "source-locks"
             lock_dir.mkdir()

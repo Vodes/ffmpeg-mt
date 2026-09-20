@@ -13,7 +13,9 @@ from .model import BuildContext
 LINUX_ALLOWED = {
     "libc.so.6",
     "libdl.so.2",
+    "libgcc_s.so.1",
     "libm.so.6",
+    "libmvec.so.1",
     "libpthread.so.0",
     "librt.so.1",
     "ld-linux-aarch64.so.1",
@@ -60,6 +62,12 @@ WINDOWS_ALLOWED = {
     "api-ms-win-crt-stdio-l1-1-0.dll",
     "api-ms-win-crt-string-l1-1-0.dll",
     "api-ms-win-crt-time-l1-1-0.dll",
+}
+
+COMPILED_FEATURE_NAMES = {
+    ("protocols", "rist"): "librist",
+    ("protocols", "sftp"): "libssh",
+    ("protocols", "srt"): "libsrt",
 }
 
 
@@ -134,7 +142,7 @@ def _assert_no_staged_shared_libraries(ctx: BuildContext) -> None:
     shared_libraries = []
     for path in ctx.prefix.rglob("*"):
         name = path.name.lower()
-        if name.endswith((".dll", ".dylib", ".so")) or ".so." in name:
+        if re.search(r"(?:\.dll|\.dylib|\.so(?:\.\d+)*)$", name):
             shared_libraries.append(path.relative_to(ctx.prefix).as_posix())
     if shared_libraries:
         raise RuntimeError(
@@ -146,7 +154,9 @@ def _assert_lazy_vaapi(ctx: BuildContext, ffmpeg: Path) -> None:
     if not ctx.target.linux:
         return
     content = ffmpeg.read_bytes()
-    missing = [name for name in (b"libva.so.2", b"libva-drm.so.2") if name not in content]
+    missing = [
+        name for name in (b"libdrm.so.2", b"libva.so.2", b"libva-drm.so.2") if name not in content
+    ]
     if missing:
         decoded = [name.decode() for name in missing]
         raise RuntimeError(f"FFmpeg is missing lazy VAAPI import shims: {decoded}")
@@ -194,7 +204,8 @@ def _assert_compiled_features(ctx: BuildContext) -> None:
     }
     for group, suffix in suffixes.items():
         for name in [*common.get(group, []), *selected.get(group, [])]:
-            macro_name = name.upper().replace("-", "_")
+            compiled_name = COMPILED_FEATURE_NAMES.get((group, name), name)
+            macro_name = compiled_name.upper().replace("-", "_")
             macro = f"#define CONFIG_{macro_name}_{suffix} 1"
             if macro not in configuration:
                 raise RuntimeError(f"expected compiled {group[:-1]} {name!r} is missing")
@@ -233,7 +244,9 @@ def _smoke_test(ctx: BuildContext, ffmpeg: Path, ffprobe: Path) -> None:
 
 
 def _vulkan_smoke(ctx: BuildContext, ffmpeg: Path) -> None:
-    if not (ctx.target.linux or ctx.target.macos):
+    # AlmaLinux 9 only ships the lavapipe runtime on x86_64. ARM64 still gets
+    # compile-time Vulkan feature validation, but has no CI device to execute.
+    if not (ctx.target.macos or (ctx.target.linux and ctx.target.arch == "x86_64")):
         return
     run(
         ffmpeg,
@@ -254,19 +267,41 @@ def _vulkan_smoke(ctx: BuildContext, ffmpeg: Path) -> None:
         "null",
         "-",
     )
+    run(
+        ffmpeg,
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-init_hw_device",
+        "vulkan=vk:0",
+        "-filter_hw_device",
+        "vk",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=duration=0.2:size=128x72:rate=5",
+        "-vf",
+        "format=nv12,hwupload,libplacebo=w=64:h=36,hwdownload,format=nv12",
+        "-f",
+        "null",
+        "-",
+    )
 
 
 def _scan_paths(ctx: BuildContext, binaries: tuple[Path, Path]) -> None:
-    needles = {
-        str(ctx.root),
+    exact_needles = {
         str(ctx.build_root),
         str(ctx.prefix),
         "/opt/homebrew",
         "/opt/llvm-mingw",
     }
+    workspace = str(ctx.root).encode()
+    workspace_pattern = re.compile(rb"(?<![.\w/])" + re.escape(workspace) + rb"(?:/|$)")
     for binary in binaries:
         content = binary.read_bytes()
-        found = sorted(needle for needle in needles if needle.encode() in content)
+        found = sorted(needle for needle in exact_needles if needle.encode() in content)
+        if workspace_pattern.search(content):
+            found.insert(0, str(ctx.root))
         if found:
             raise RuntimeError(f"{binary.name} leaks build paths: {found}")
 

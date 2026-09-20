@@ -16,10 +16,13 @@ def run_in_container(root: Path, target: str, jobs: int, with_fdk_aac: bool, cle
         )
     image = "ffmpeg-mt-builder:almalinux9"
     if os.environ.get("FFMPEG_MT_SKIP_IMAGE_BUILD") != "1":
+        image_stage = "builder" if target.startswith("windows-") else "linux_builder"
         subprocess.run(
             [
                 "docker",
                 "build",
+                "--target",
+                image_stage,
                 "--tag",
                 image,
                 "--file",

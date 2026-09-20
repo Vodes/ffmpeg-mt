@@ -87,6 +87,7 @@ class BuildContext:
         prefix = str(self.prefix)
         maps = f"-ffile-prefix-map={self.root}=. -fdebug-prefix-map={self.root}=."
         env = dict(os.environ)
+        pic = " -fPIC" if not self.target.windows else ""
         env.update(
             {
                 "PKG_CONFIG_LIBDIR": os.pathsep.join(
@@ -103,8 +104,8 @@ class BuildContext:
                 "CARGO_HOME": str(self.root / ".cache" / "cargo"),
                 "RUSTFLAGS": f"--remap-path-prefix={self.root}=.",
                 "CPPFLAGS": f"-I{prefix}/include",
-                "CFLAGS": f"-O2 {maps}",
-                "CXXFLAGS": f"-O2 {maps}",
+                "CFLAGS": f"-O2 {maps}{pic}",
+                "CXXFLAGS": f"-O2 {maps}{pic}",
                 "LDFLAGS": f"-L{prefix}/lib",
             }
         )

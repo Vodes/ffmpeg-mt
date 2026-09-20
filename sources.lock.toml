@@ -142,7 +142,13 @@ version = "13.0.19.0"
 url = "https://github.com/FFmpeg/nv-codec-headers/archive/refs/tags/n13.0.19.0.tar.gz"
 sha256 = "86d15d1a7c0ac73a0eafdfc57bebfeba7da8264595bf531cf4d8db1c22940116"
 license = "MIT"
-license_files = ["LICENSE"]
+license_files = [
+  "include/ffnvcodec/dynlink_cuda.h",
+  "include/ffnvcodec/dynlink_cuviddec.h",
+  "include/ffnvcodec/dynlink_loader.h",
+  "include/ffnvcodec/dynlink_nvcuvid.h",
+  "include/ffnvcodec/nvEncodeAPI.h",
+]
 
 [sources.amf]
 version = "1.5.2"
@@ -312,13 +318,6 @@ sha256 = "7d8a1361bb094ec3f511964e78a5a4dba689b5986e112afabe4f4d0d6c6125c3"
 license = "LGPL-2.1-or-later"
 license_files = ["COPYING"]
 
-[sources.curl]
-version = "8.14.1"
-url = "https://curl.se/download/curl-8.14.1.tar.xz"
-sha256 = "f4619a1e2474c4bbfedc88a7c2191209c8334b48fa1f4e53fd584cc12e9120dd"
-license = "curl"
-license_files = ["COPYING"]
-
 [sources.fdk_aac]
 version = "2.0.3"
 url = "https://github.com/mstorsjo/fdk-aac/archive/refs/tags/v2.0.3.tar.gz"
@@ -334,11 +333,11 @@ license = "Apache-2.0"
 license_files = ["LICENSE.md"]
 
 [sources.vulkan_loader]
-version = "1.4.321"
-url = "https://github.com/KhronosGroup/Vulkan-Loader/archive/refs/tags/v1.4.321.tar.gz"
-sha256 = "00669f6bb2db35c8df07f0b118c09bfe0ebffecaad7d80647a429eece0e37ac3"
-license = "Apache-2.0"
-license_files = ["LICENSE.txt"]
+version = "65b3936528cd92eb4ea3de485d03f858a3850484"
+url = "https://github.com/BtbN/Vulkan-Shim-Loader/archive/65b3936528cd92eb4ea3de485d03f858a3850484.tar.gz"
+sha256 = "1cea0208588bd9d30379e7b83800dd7a32ca68d43c118642693be57782f8633d"
+license = "MIT"
+license_files = ["LICENSE"]
 
 [sources.opencl_headers]
 version = "2025.07.22"
@@ -359,7 +358,7 @@ version = "2.4.125"
 url = "https://dri.freedesktop.org/libdrm/libdrm-2.4.125.tar.xz"
 sha256 = "d4bae92797a50f81a93524762e0410a49cd84cfa0f997795bc0172ac8fb1d96a"
 license = "MIT"
-license_files = ["LICENSE"]
+license_files = ["xf86drm.h", "xf86drmMode.h"]
 
 [sources.libva]
 version = "2.22.0"
@@ -400,6 +399,55 @@ license_files = ["LICENSE.txt"]
 version = "2026.2"
 url = "https://github.com/google/shaderc/archive/refs/tags/v2026.2.tar.gz"
 sha256 = "f924178e75e3293082481b25ed64d5e48a795b479dac3bd3c83d23070855df42"
+license = "Apache-2.0"
+license_files = ["LICENSE"]
+
+[sources.shaderc_abseil]
+version = "1315c900e1ddbb08a23e06eeb9a06450052ccb5e"
+url = "https://github.com/abseil/abseil-cpp/archive/1315c900e1ddbb08a23e06eeb9a06450052ccb5e.tar.gz"
+sha256 = "4ae9fc64860d5204f0ca6bd6c7a5f8e59ced118494db7e14537d8ed55dce5715"
+license = "Apache-2.0"
+license_files = ["LICENSE"]
+
+[sources.shaderc_effcee]
+version = "08da24ec245a274fea3a128ba50068f163390565"
+url = "https://github.com/google/effcee/archive/08da24ec245a274fea3a128ba50068f163390565.tar.gz"
+sha256 = "d6d6b602f1b6f09d3a83c44a067d087c23fdc3d3530e2e5dd27be2adda91fe4d"
+license = "Apache-2.0"
+license_files = ["LICENSE"]
+
+[sources.shaderc_glslang]
+version = "5ed4003a18a10a9d1bd7e43aaf1664499abffa83"
+url = "https://github.com/KhronosGroup/glslang/archive/5ed4003a18a10a9d1bd7e43aaf1664499abffa83.tar.gz"
+sha256 = "66ada8e61f1bd59faaddeff2f047d139fb6cb60ac17d7fcecaebe27a169ecb2f"
+license = "BSD-3-Clause"
+license_files = ["LICENSE.txt"]
+
+[sources.shaderc_googletest]
+version = "1d17ea141d2c11b8917d2c7d029f1c4e2b9769b2"
+url = "https://github.com/google/googletest/archive/1d17ea141d2c11b8917d2c7d029f1c4e2b9769b2.tar.gz"
+sha256 = "7aca173cc96c0feaa01035184e34b020daaa93ddc132c5a829b7ea34006f701b"
+license = "BSD-3-Clause"
+license_files = ["LICENSE"]
+
+[sources.shaderc_re2]
+version = "4a8cee3dd3c3d81b6fe8b867811e193d5819df07"
+url = "https://github.com/google/re2/archive/4a8cee3dd3c3d81b6fe8b867811e193d5819df07.tar.gz"
+sha256 = "f0a65168e64a10ab556b265f2f411678e6b9555f21e04202f84f250b659954ba"
+license = "BSD-3-Clause"
+license_files = ["LICENSE"]
+
+[sources.shaderc_spirv_headers]
+version = "ad9184e76a66b1001c29db9b0a3e87f646c64de0"
+url = "https://github.com/KhronosGroup/SPIRV-Headers/archive/ad9184e76a66b1001c29db9b0a3e87f646c64de0.tar.gz"
+sha256 = "b5b7eba62453eb8c6f6a5fbf7155b71cde693bafe9cd5f03b79ed8c714816afe"
+license = "MIT"
+license_files = ["LICENSE"]
+
+[sources.shaderc_spirv_tools]
+version = "c1cb30bb04e2bf911755a40df1242cc6e3d83e26"
+url = "https://github.com/KhronosGroup/SPIRV-Tools/archive/c1cb30bb04e2bf911755a40df1242cc6e3d83e26.tar.gz"
+sha256 = "469f0e1221354803d7c81deb334c172a681826adb11471b36ada5a77cf53ad45"
 license = "Apache-2.0"
 license_files = ["LICENSE"]
 
@@ -460,9 +508,9 @@ license = "MIT"
 license_files = ["LICENSE"]
 
 [sources.openal]
-version = "c157b87cb9eb58d747748e49f82ee4a64d1dcf8b"
-url = "https://github.com/kcat/openal-soft/archive/c157b87cb9eb58d747748e49f82ee4a64d1dcf8b.tar.gz"
-sha256 = "3f0ed61cfd56d1e5d50a8ccac00af4970fdec07a80f311c3e24eac8c2f40e612"
+version = "1.24.3"
+url = "https://github.com/kcat/openal-soft/archive/refs/tags/1.24.3.tar.gz"
+sha256 = "7e1fecdeb45e7f78722b776c5cf30bd33934b961d7fd2a11e0494e064cc631ce"
 license = "LGPL-2.0-or-later"
 license_files = ["COPYING"]
 
@@ -540,6 +588,13 @@ license_files = ["LICENCE.md"]
 version = "2.84.3"
 url = "https://download.gnome.org/sources/glib/2.84/glib-2.84.3.tar.xz"
 sha256 = "aa4f87c3225bf57ca85f320888f7484901a17934ca37023c3bd8435a72db863e"
+license = "LGPL-2.1-or-later"
+license_files = ["COPYING"]
+
+[sources.proxy_libintl]
+version = "33934de09af6a6627eb44e310a8079df009abdbb"
+url = "https://github.com/frida/proxy-libintl/archive/33934de09af6a6627eb44e310a8079df009abdbb.tar.gz"
+sha256 = "4ab5af85ec6124cb526a15c58bbc0877d241807e30855779808dbf9292d861aa"
 license = "LGPL-2.1-or-later"
 license_files = ["COPYING"]
 

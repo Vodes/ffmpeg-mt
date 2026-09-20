@@ -6,7 +6,7 @@ import os
 import shutil
 import subprocess
 import tarfile
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -138,6 +138,8 @@ def autotools(
     *arguments: str,
     configure: str = "configure",
     autoreconf: bool = False,
+    install_prefix: str | Path | None = None,
+    install_destdir: Path | None = None,
 ) -> None:
     env = ctx.env()
     if autoreconf:
@@ -146,7 +148,7 @@ def autotools(
     build_dir.mkdir(parents=True, exist_ok=True)
     run(
         str(source / configure),
-        f"--prefix={ctx.prefix}",
+        f"--prefix={install_prefix if install_prefix is not None else ctx.prefix}",
         "--disable-shared",
         "--enable-static",
         *_host_args(ctx),
@@ -154,13 +156,23 @@ def autotools(
         cwd=build_dir,
         env=env,
     )
-    make(ctx, build_dir)
+    run("make", f"-j{ctx.jobs}", cwd=build_dir, env=env)
+    install_variables = [f"DESTDIR={install_destdir}"] if install_destdir is not None else []
+    run("make", *install_variables, "install", cwd=build_dir, env=env)
 
 
-def cmake(ctx: BuildContext, source: Path, *arguments: str) -> None:
+def cmake(
+    ctx: BuildContext,
+    source: Path,
+    *arguments: str,
+    install_prefix: str | Path | None = None,
+    install_destdir: Path | None = None,
+    after_configure: Callable[[Path], None] | None = None,
+) -> None:
     build_dir = ctx.work_root / source.name
     toolchain: list[str] = []
     env = ctx.env()
+    selected_prefix = install_prefix if install_prefix is not None else ctx.prefix
     if ctx.target.windows:
         toolchain = [f"-DCMAKE_TOOLCHAIN_FILE={ctx.root / 'cmake' / 'llvm-mingw.cmake'}"]
     else:
@@ -173,7 +185,7 @@ def cmake(ctx: BuildContext, source: Path, *arguments: str) -> None:
         "-B",
         build_dir,
         "-GNinja",
-        f"-DCMAKE_INSTALL_PREFIX={ctx.prefix}",
+        f"-DCMAKE_INSTALL_PREFIX={selected_prefix}",
         "-DCMAKE_INSTALL_LIBDIR=lib",
         "-DCMAKE_BUILD_TYPE=Release",
         "-DBUILD_SHARED_LIBS=OFF",
@@ -183,13 +195,26 @@ def cmake(ctx: BuildContext, source: Path, *arguments: str) -> None:
         *arguments,
         env=env,
     )
+    if after_configure is not None:
+        after_configure(build_dir)
     run("cmake", "--build", build_dir, "--parallel", str(ctx.jobs), env=env)
-    run("cmake", "--install", build_dir, env=env)
+    install_env = dict(env)
+    if install_destdir is not None:
+        install_env["DESTDIR"] = str(install_destdir)
+    run("cmake", "--install", build_dir, env=install_env)
 
 
-def meson(ctx: BuildContext, source: Path, *arguments: str) -> None:
+def meson(
+    ctx: BuildContext,
+    source: Path,
+    *arguments: str,
+    install_prefix: str | Path | None = None,
+    install_destdir: Path | None = None,
+) -> None:
     build_dir = ctx.work_root / source.name
     cross: list[str] = []
+    env = ctx.env()
+    selected_prefix = install_prefix if install_prefix is not None else ctx.prefix
     if ctx.target.windows:
         cross = ["--cross-file", str(ctx.root / "meson" / f"{ctx.target.name}.ini")]
     run(
@@ -197,17 +222,20 @@ def meson(ctx: BuildContext, source: Path, *arguments: str) -> None:
         "setup",
         build_dir,
         source,
-        f"--prefix={ctx.prefix}",
+        f"--prefix={selected_prefix}",
         "--libdir=lib",
         "--default-library=static",
         "--buildtype=release",
         "--wrap-mode=nodownload",
         *cross,
         *arguments,
-        env=ctx.env(),
+        env=env,
     )
-    run("meson", "compile", "-C", build_dir, "-j", str(ctx.jobs), env=ctx.env())
-    run("meson", "install", "-C", build_dir, env=ctx.env())
+    run("meson", "compile", "-C", build_dir, "-j", str(ctx.jobs), env=env)
+    install_env = dict(env)
+    if install_destdir is not None:
+        install_env["DESTDIR"] = str(install_destdir)
+    run("meson", "install", "-C", build_dir, env=install_env)
 
 
 def make(

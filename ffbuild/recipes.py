@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 import shutil
 import sys
 from collections.abc import Callable
@@ -48,7 +49,16 @@ def record_llvm_mingw(ctx: BuildContext) -> None:
 
 
 def build_zlib(ctx: BuildContext) -> None:
-    cmake(ctx, extract(ctx, "zlib"), "-DZLIB_BUILD_EXAMPLES=OFF")
+    source = extract(ctx, "zlib")
+    run(
+        source / "configure",
+        f"--prefix={ctx.prefix}",
+        f"--libdir={ctx.prefix / 'lib'}",
+        "--static",
+        cwd=source,
+        env=ctx.env(),
+    )
+    make(ctx, source)
 
 
 def build_xz(ctx: BuildContext) -> None:
@@ -59,6 +69,11 @@ def build_xz(ctx: BuildContext) -> None:
 
 def build_openssl(ctx: BuildContext) -> None:
     source = extract(ctx, "openssl")
+    env = ctx.env()
+    for name in ("CPPFLAGS", "CFLAGS", "CXXFLAGS", "LDFLAGS"):
+        env[name] = " ".join(
+            token for token in shlex.split(env[name]) if str(ctx.root) not in token
+        )
     platform = {
         "linux-x86_64": "linux-x86_64",
         "linux-arm64": "linux-aarch64",
@@ -69,17 +84,23 @@ def build_openssl(ctx: BuildContext) -> None:
     run(
         source / "Configure",
         platform,
-        f"--prefix={ctx.prefix}",
-        f"--openssldir={ctx.prefix / 'ssl'}",
+        "--prefix=/",
+        "--openssldir=/ssl",
+        "--libdir=lib",
         "no-shared",
+        "no-module",
         "no-tests",
         "no-apps",
         "no-docs",
         cwd=source,
-        env=ctx.env(),
+        env=env,
     )
-    run("make", f"-j{ctx.jobs}", cwd=source, env=ctx.env())
-    run("make", "install_sw", cwd=source, env=ctx.env())
+    run("make", f"-j{ctx.jobs}", cwd=source, env=env)
+    run("make", f"DESTDIR={ctx.prefix}", "install_sw", cwd=source, env=env)
+    for name in ("libcrypto.pc", "libssl.pc", "openssl.pc"):
+        _set_pkg_config_variables(
+            ctx.prefix / "lib" / "pkgconfig" / name, {"prefix": str(ctx.prefix)}
+        )
 
 
 def build_expat(ctx: BuildContext) -> None:
@@ -99,12 +120,24 @@ def build_iconv(ctx: BuildContext) -> None:
 
 
 def build_xml2(ctx: BuildContext) -> None:
-    autotools(
+    cmake(
         ctx,
         extract(ctx, "xml2"),
-        "--without-python",
-        "--without-http",
-        autoreconf=True,
+        "-DCMAKE_INSTALL_BINDIR=/bin",
+        "-DCMAKE_INSTALL_LIBDIR=/lib",
+        "-DCMAKE_INSTALL_INCLUDEDIR=/include",
+        "-DCMAKE_INSTALL_DATAROOTDIR=/share",
+        "-DCMAKE_INSTALL_DATADIR=/share",
+        "-DCMAKE_INSTALL_SYSCONFDIR=/etc",
+        "-DLIBXML2_WITH_MODULES=OFF",
+        "-DLIBXML2_WITH_PROGRAMS=OFF",
+        "-DLIBXML2_WITH_PYTHON=OFF",
+        "-DLIBXML2_WITH_TESTS=OFF",
+        install_prefix="/",
+        install_destdir=ctx.prefix,
+    )
+    _set_pkg_config_variables(
+        ctx.prefix / "lib" / "pkgconfig" / "libxml-2.0.pc", {"prefix": str(ctx.prefix)}
     )
 
 
@@ -129,15 +162,30 @@ def build_bluray(ctx: BuildContext) -> None:
 
 
 def build_dvdcss(ctx: BuildContext) -> None:
-    autotools(ctx, extract(ctx, "dvdcss"), "--disable-doc", autoreconf=True)
+    meson(
+        ctx,
+        extract(ctx, "dvdcss"),
+        "-Denable_docs=false",
+        "-Denable_examples=false",
+    )
 
 
 def build_dvdread(ctx: BuildContext) -> None:
-    autotools(ctx, extract(ctx, "dvdread"), "--disable-apidoc", autoreconf=True)
+    meson(
+        ctx,
+        extract(ctx, "dvdread"),
+        "-Denable_docs=false",
+        "-Dlibdvdcss=enabled",
+    )
 
 
 def build_dvdnav(ctx: BuildContext) -> None:
-    autotools(ctx, extract(ctx, "dvdnav"), "--disable-examples", autoreconf=True)
+    meson(
+        ctx,
+        extract(ctx, "dvdnav"),
+        "-Denable_docs=false",
+        "-Denable_examples=false",
+    )
 
 
 def build_aribcaption(ctx: BuildContext) -> None:
@@ -149,6 +197,7 @@ def build_aribcaption(ctx: BuildContext) -> None:
         "-DARIBCC_USE_FREETYPE=ON",
         "-DARIBCC_USE_EMBEDDED_FREETYPE=OFF",
     )
+    _ensure_static_cpp_runtime(ctx, ctx.prefix / "lib" / "pkgconfig" / "libaribcaption.pc")
 
 
 def build_openal(ctx: BuildContext) -> None:
@@ -163,8 +212,12 @@ def build_openal(ctx: BuildContext) -> None:
         "-DALSOFT_BACKEND_PULSEAUDIO=OFF",
     ]
     if ctx.target.linux:
-        args += ["-DALSOFT_BACKEND_ALSA=OFF", "-DALSOFT_BACKEND_OSS=OFF"]
+        args += ["-DALSOFT_BACKEND_ALSA=ON", "-DALSOFT_BACKEND_OSS=OFF"]
     cmake(ctx, extract(ctx, "openal"), *args)
+    pkg_config = ctx.prefix / "lib" / "pkgconfig" / "openal.pc"
+    _ensure_static_cpp_runtime(ctx, pkg_config)
+    if ctx.target.windows:
+        _append_pkg_config_tokens(pkg_config, "Libs.private", ["-lole32", "-luuid"])
 
 
 def build_rubberband(ctx: BuildContext) -> None:
@@ -180,6 +233,10 @@ def build_rubberband(ctx: BuildContext) -> None:
         "-Dcmdline=disabled",
         "-Dtests=disabled",
     )
+    _append_pkg_config_tokens(
+        ctx.prefix / "lib" / "pkgconfig" / "rubberband.pc", "Libs.private", ["-lm"]
+    )
+    _ensure_static_cpp_runtime(ctx, ctx.prefix / "lib" / "pkgconfig" / "rubberband.pc")
 
 
 def build_soxr(ctx: BuildContext) -> None:
@@ -257,9 +314,20 @@ def build_pcre2(ctx: BuildContext) -> None:
 
 
 def build_glib(ctx: BuildContext) -> None:
+    source = extract(ctx, "glib")
+    if ctx.target.macos:
+        # Darwin has no libc-provided gettext API. This is the exact fallback
+        # commit referenced by GLib's proxy-libintl.wrap, staged explicitly so
+        # Meson's nodownload mode remains hermetic.
+        proxy_libintl = extract(ctx, "proxy_libintl")
+        shutil.copytree(
+            proxy_libintl,
+            source / "subprojects" / "proxy-libintl",
+            dirs_exist_ok=True,
+        )
     meson(
         ctx,
-        extract(ctx, "glib"),
+        source,
         "-Dtests=false",
         "-Dinstalled_tests=false",
         "-Dglib_debug=disabled",
@@ -274,6 +342,9 @@ def build_glib(ctx: BuildContext) -> None:
         "-Dlibmount=disabled",
         "-Ddtrace=disabled",
         "-Dsystemtap=disabled",
+        "-Dpkgconfig.relocatable=true",
+        install_prefix="/",
+        install_destdir=ctx.prefix,
     )
 
 
@@ -317,6 +388,9 @@ def build_pango(ctx: BuildContext) -> None:
         "-Dman-pages=false",
         "-Dbuild-testsuite=false",
         "-Dbuild-examples=false",
+        "-Dpkgconfig.relocatable=true",
+        install_prefix="/",
+        install_destdir=ctx.prefix,
     )
 
 
@@ -343,7 +417,6 @@ def build_rsvg(ctx: BuildContext) -> None:
         "-Davif=disabled",
         "-Dpixbuf=disabled",
         "-Dpixbuf-loader=disabled",
-        "-Drsvg-convert=disabled",
         "-Dintrospection=disabled",
         "-Dvala=disabled",
         "-Ddocs=disabled",
@@ -352,7 +425,7 @@ def build_rsvg(ctx: BuildContext) -> None:
 
 
 def build_gmp(ctx: BuildContext) -> None:
-    autotools(ctx, extract(ctx, "gmp"), "--disable-assembly")
+    autotools(ctx, extract(ctx, "gmp"))
 
 
 def build_unistring(ctx: BuildContext) -> None:
@@ -369,13 +442,17 @@ def build_gnutls(ctx: BuildContext) -> None:
         extract(ctx, "gnutls"),
         "--disable-cxx",
         "--disable-doc",
-        "--disable-guile",
         "--disable-libdane",
         "--disable-nls",
         "--disable-tests",
         "--disable-tools",
         "--with-included-libtasn1",
         "--without-p11-kit",
+        install_prefix="/",
+        install_destdir=ctx.prefix,
+    )
+    _set_pkg_config_variables(
+        ctx.prefix / "lib" / "pkgconfig" / "gnutls.pc", {"prefix": str(ctx.prefix)}
     )
 
 
@@ -384,35 +461,55 @@ def build_vulkan_headers(ctx: BuildContext) -> None:
 
 
 def build_vulkan_loader(ctx: BuildContext) -> None:
+    source = extract(ctx, "vulkan_loader")
+    shutil.copytree(
+        ctx.source_dirs["vulkan_headers"], source / "Vulkan-Headers", dirs_exist_ok=True
+    )
     cmake(
         ctx,
-        extract(ctx, "vulkan_loader"),
-        "-DBUILD_TESTS=OFF",
-        "-DBUILD_WSI_XCB_SUPPORT=OFF",
-        "-DBUILD_WSI_XLIB_SUPPORT=OFF",
-        "-DBUILD_WSI_WAYLAND_SUPPORT=OFF",
-        "-DBUILD_WSI_DIRECTFB_SUPPORT=OFF",
+        source,
+        "-DVULKAN_SHIM_IMPERSONATE=ON",
     )
 
 
 def build_opencl_headers(ctx: BuildContext) -> None:
-    cmake(ctx, extract(ctx, "opencl_headers"), "-DOPENCL_HEADERS_BUILD_TESTING=OFF")
+    cmake(
+        ctx,
+        extract(ctx, "opencl_headers"),
+        "-DBUILD_TESTING=OFF",
+        "-DOPENCL_HEADERS_BUILD_TESTING=OFF",
+    )
 
 
 def build_opencl_loader(ctx: BuildContext) -> None:
     cmake(
         ctx,
         extract(ctx, "opencl_loader"),
+        "-DBUILD_TESTING=OFF",
+        "-DENABLE_OPENCL_LAYERS=OFF",
         "-DOPENCL_ICD_LOADER_BUILD_TESTING=OFF",
         "-DOPENCL_ICD_LOADER_BUILD_SHARED_LIBS=OFF",
         f"-DOPENCL_ICD_LOADER_HEADERS_DIR={ctx.prefix / 'include'}",
     )
+    private = ["-lcfgmgr32", "-lruntimeobject"] if ctx.target.windows else ["-ldl", "-pthread"]
+    _append_pkg_config_tokens(
+        ctx.prefix / "lib" / "pkgconfig" / "OpenCL.pc", "Libs.private", private
+    )
 
 
 def build_libdrm(ctx: BuildContext) -> None:
-    meson(
-        ctx,
-        extract(ctx, "libdrm"),
+    source = extract(ctx, "libdrm")
+    build_dir = ctx.work_root / "libdrm"
+    run(
+        "meson",
+        "setup",
+        build_dir,
+        source,
+        f"--prefix={ctx.prefix}",
+        "--libdir=lib",
+        "--default-library=shared",
+        "--buildtype=release",
+        "--wrap-mode=nodownload",
         "-Dintel=disabled",
         "-Dradeon=disabled",
         "-Damdgpu=disabled",
@@ -423,7 +520,19 @@ def build_libdrm(ctx: BuildContext) -> None:
         "-Detnaviv=disabled",
         "-Dtests=false",
         "-Dudev=false",
+        env=ctx.env(),
     )
+    run("meson", "compile", "-C", build_dir, "-j", str(ctx.jobs), env=ctx.env())
+    run("meson", "install", "-C", build_dir, env=ctx.env())
+
+    library_dir = ctx.prefix / "lib"
+    _generate_import_library(
+        ctx,
+        ctx.source_dirs["implib"],
+        library_dir / "libdrm.so.2",
+        library_dir / "libdrm.a",
+    )
+    _add_implib_link_flags(library_dir / "pkgconfig" / "libdrm.pc")
 
 
 def prepare_implib(ctx: BuildContext) -> None:
@@ -453,13 +562,12 @@ def _generate_import_library(
     if not generated:
         raise RuntimeError(f"Implib.so generated no sources for {shared_library.name}")
     objects: list[Path] = []
+    env = ctx.env()
     for source in generated:
         object_file = work / f"{source.name}.o"
         run(
-            "ccache",
-            "gcc",
-            "-O2",
-            "-fPIC",
+            *shlex.split(env["CC"]),
+            *shlex.split(env["CFLAGS"]),
             "-Wa,--noexecstack",
             "-DIMPLIB_HIDDEN_SHIMS",
             "-c",
@@ -467,10 +575,10 @@ def _generate_import_library(
             "-o",
             object_file,
             cwd=work,
-            env=ctx.env(),
+            env=env,
         )
         objects.append(object_file)
-    run("ar", "rcs", output, *objects, cwd=work, env=ctx.env())
+    run(env["AR"], "rcs", output, *objects, cwd=work, env=env)
 
 
 def _add_implib_link_flags(pkg_config: Path) -> None:
@@ -482,6 +590,65 @@ def _add_implib_link_flags(pkg_config: Path) -> None:
     else:
         lines.append("Libs.private: -ldl -pthread")
     pkg_config.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _set_pkg_config_fields(pkg_config: Path, fields: dict[str, str]) -> None:
+    lines = pkg_config.read_text(encoding="utf-8").splitlines()
+    remaining = dict(fields)
+    for index, line in enumerate(lines):
+        key = line.partition(":")[0]
+        if key in remaining:
+            lines[index] = f"{key}: {remaining.pop(key)}"
+    lines.extend(f"{key}: {value}" for key, value in remaining.items())
+    pkg_config.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _set_pkg_config_variables(pkg_config: Path, variables: dict[str, str]) -> None:
+    lines = pkg_config.read_text(encoding="utf-8").splitlines()
+    remaining = dict(variables)
+    for index, line in enumerate(lines):
+        key, separator, _ = line.partition("=")
+        if separator and key in remaining:
+            lines[index] = f"{key}={remaining.pop(key)}"
+    lines.extend(f"{key}={value}" for key, value in remaining.items())
+    pkg_config.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _remove_pkg_config_tokens(pkg_config: Path, unwanted: set[str]) -> None:
+    lines = pkg_config.read_text(encoding="utf-8").splitlines()
+    cleaned = [" ".join(token for token in line.split() if token not in unwanted) for line in lines]
+    pkg_config.write_text("\n".join(cleaned) + "\n", encoding="utf-8")
+
+
+def _replace_pkg_config_token_suffix(pkg_config: Path, suffix: str, replacement: str) -> None:
+    lines = pkg_config.read_text(encoding="utf-8").splitlines()
+    replaced = [
+        " ".join(replacement if token.endswith(suffix) else token for token in line.split())
+        for line in lines
+    ]
+    pkg_config.write_text("\n".join(replaced) + "\n", encoding="utf-8")
+
+
+def _append_pkg_config_tokens(pkg_config: Path, field: str, tokens: list[str]) -> None:
+    lines = pkg_config.read_text(encoding="utf-8").splitlines()
+    for index, line in enumerate(lines):
+        key, separator, value = line.partition(":")
+        if separator and key == field:
+            current = value.split()
+            current.extend(token for token in tokens if token not in current)
+            lines[index] = f"{field}: {' '.join(current)}"
+            break
+    else:
+        lines.append(f"{field}: {' '.join(tokens)}")
+    pkg_config.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _ensure_static_cpp_runtime(ctx: BuildContext, pkg_config: Path) -> None:
+    runtime = "-lstdc++" if ctx.target.linux else "-lc++"
+    _replace_pkg_config_token_suffix(pkg_config, "libstdc++.a", runtime)
+    _replace_pkg_config_token_suffix(pkg_config, "libc++.a", runtime)
+    if runtime not in pkg_config.read_text(encoding="utf-8").split():
+        _append_pkg_config_tokens(pkg_config, "Libs.private", [runtime])
 
 
 def build_libva(ctx: BuildContext) -> None:
@@ -516,6 +683,8 @@ def build_libva(ctx: BuildContext) -> None:
     )
     for shared_library in library_dir.glob("libva*.so*"):
         shared_library.unlink()
+    for shared_library in library_dir.glob("libdrm*.so*"):
+        shared_library.unlink()
     _add_implib_link_flags(library_dir / "pkgconfig" / "libva.pc")
     _add_implib_link_flags(library_dir / "pkgconfig" / "libva-drm.pc")
 
@@ -531,7 +700,16 @@ def build_freetype(ctx: BuildContext) -> None:
 
 
 def build_fontconfig(ctx: BuildContext) -> None:
-    meson(ctx, extract(ctx, "fontconfig"), "-Ddoc=disabled", "-Dtests=disabled", "-Dtools=disabled")
+    meson(
+        ctx,
+        extract(ctx, "fontconfig"),
+        "-Ddoc=disabled",
+        "-Dtests=disabled",
+        "-Dtools=disabled",
+        "-Dpkgconfig.relocatable=true",
+        install_prefix="/",
+        install_destdir=ctx.prefix,
+    )
 
 
 def build_harfbuzz(ctx: BuildContext) -> None:
@@ -585,8 +763,6 @@ def build_svtav1(ctx: BuildContext) -> None:
         ctx,
         extract(ctx, "svtav1"),
         "-DBUILD_APPS=OFF",
-        "-DBUILD_DEC=OFF",
-        "-DBUILD_ENC=ON",
         "-DBUILD_TESTING=OFF",
     )
 
@@ -602,9 +778,12 @@ def build_vpx(ctx: BuildContext) -> None:
     }
     build_dir = ctx.work_root / "vpx"
     build_dir.mkdir(parents=True, exist_ok=True)
+    install_root = ctx.work_root / "vpx-install"
+    if install_root.exists():
+        shutil.rmtree(install_root)
     run(
         source / "configure",
-        f"--prefix={ctx.prefix}",
+        "--prefix=/ffmpeg",
         f"--target={targets[ctx.target.name]}",
         "--disable-shared",
         "--enable-static",
@@ -615,12 +794,16 @@ def build_vpx(ctx: BuildContext) -> None:
         cwd=build_dir,
         env=ctx.env(),
     )
-    make(ctx, build_dir)
+    make(ctx, build_dir, variables=(f"DESTDIR={install_root}",))
+    shutil.copytree(install_root / "ffmpeg", ctx.prefix, dirs_exist_ok=True)
+    _set_pkg_config_variables(
+        ctx.prefix / "lib" / "pkgconfig" / "vpx.pc", {"prefix": str(ctx.prefix)}
+    )
 
 
 def build_lamer(ctx: BuildContext) -> None:
     source = extract(ctx, "lamer")
-    run("make", f"-j{ctx.jobs}", cwd=source, env=ctx.env())
+    run("make", f"-j{ctx.jobs}", "lib", cwd=source, env=ctx.env())
     run("make", f"PREFIX={ctx.prefix}", "install", cwd=source, env=ctx.env())
 
 
@@ -651,6 +834,7 @@ def build_vmaf(ctx: BuildContext) -> None:
         "-Denable_docs=false",
         "-Denable_tools=false",
     )
+    _ensure_static_cpp_runtime(ctx, ctx.prefix / "lib" / "pkgconfig" / "libvmaf.pc")
 
 
 def build_x264(ctx: BuildContext) -> None:
@@ -669,6 +853,7 @@ def build_x264(ctx: BuildContext) -> None:
 
 def build_x265(ctx: BuildContext) -> None:
     cmake(ctx, extract(ctx, "x265") / "source", "-DENABLE_CLI=OFF", "-DENABLE_SHARED=OFF")
+    _ensure_static_cpp_runtime(ctx, ctx.prefix / "lib" / "pkgconfig" / "x265.pc")
 
 
 def build_openjpeg(ctx: BuildContext) -> None:
@@ -684,7 +869,20 @@ def build_lc3(ctx: BuildContext) -> None:
 
 
 def build_mysofa(ctx: BuildContext) -> None:
-    cmake(ctx, extract(ctx, "mysofa"), "-DBUILD_TESTS=OFF", "-DBUILD_SHARED_LIBS=OFF")
+    cmake(
+        ctx,
+        extract(ctx, "mysofa"),
+        "-DBUILD_TESTS=OFF",
+        "-DBUILD_SHARED_LIBS=OFF",
+        "-DCMAKE_INSTALL_LIBDIR=/lib",
+        "-DCMAKE_INSTALL_INCLUDEDIR=/include",
+        "-DCMAKE_INSTALL_DATADIR=/share",
+        install_prefix="/",
+        install_destdir=ctx.prefix,
+    )
+    _set_pkg_config_variables(
+        ctx.prefix / "lib" / "pkgconfig" / "libmysofa.pc", {"prefix": str(ctx.prefix)}
+    )
 
 
 def build_qrencode(ctx: BuildContext) -> None:
@@ -693,11 +891,31 @@ def build_qrencode(ctx: BuildContext) -> None:
 
 def build_quirc(ctx: BuildContext) -> None:
     source = extract(ctx, "quirc")
-    run("make", f"-j{ctx.jobs}", "libquirc.a", cwd=source, env=ctx.env())
+    env = ctx.env()
+    work = ctx.work_root / "quirc"
+    work.mkdir(parents=True, exist_ok=True)
+    objects: list[Path] = []
+    for filename in ("decode.c", "identify.c", "quirc.c", "version_db.c"):
+        object_file = work / f"{Path(filename).stem}.o"
+        run(
+            *shlex.split(env["CC"]),
+            *shlex.split(env["CFLAGS"]),
+            "-I",
+            source / "lib",
+            "-c",
+            source / "lib" / filename,
+            "-o",
+            object_file,
+            env=env,
+        )
+        objects.append(object_file)
+    archive = work / "libquirc.a"
+    run(env["AR"], "rcs", archive, *objects, env=env)
+    run(env["RANLIB"], archive, env=env)
     (ctx.prefix / "include").mkdir(exist_ok=True)
     (ctx.prefix / "lib").mkdir(exist_ok=True)
     shutil.copy2(source / "lib" / "quirc.h", ctx.prefix / "include")
-    shutil.copy2(source / "libquirc.a", ctx.prefix / "lib")
+    shutil.copy2(archive, ctx.prefix / "lib")
     pc = ctx.prefix / "lib" / "pkgconfig"
     pc.mkdir(exist_ok=True)
     (pc / "quirc.pc").write_text(
@@ -715,52 +933,67 @@ def build_sdl2(ctx: BuildContext) -> None:
         "-DSDL_SHARED=OFF",
         "-DSDL_STATIC=ON",
         "-DSDL_TEST=OFF",
-        "-DSDL_TEST_LIBRARY=OFF",
+        "-DSDL_TESTS=OFF",
+        "-DSDL2_DISABLE_SDL2MAIN=ON",
     )
+    if ctx.target.windows:
+        _remove_pkg_config_tokens(
+            ctx.prefix / "lib" / "pkgconfig" / "sdl2.pc",
+            {"-mwindows", "-lmingw32", "-lSDL2main", "-Dmain=SDL_main"},
+        )
 
 
 def build_srt(ctx: BuildContext) -> None:
+    encryption = "OFF" if ctx.target.name == "windows-arm64" else "ON"
     cmake(
         ctx,
         extract(ctx, "srt"),
         "-DENABLE_SHARED=OFF",
         "-DENABLE_STATIC=ON",
         "-DENABLE_APPS=OFF",
-        "-DENABLE_ENCRYPTION=OFF",
+        f"-DENABLE_ENCRYPTION={encryption}",
     )
+    _ensure_static_cpp_runtime(ctx, ctx.prefix / "lib" / "pkgconfig" / "srt.pc")
 
 
 def build_rist(ctx: BuildContext) -> None:
-    meson(ctx, extract(ctx, "rist"), "-Dtest=false", "-Dtools=false", "-Dbuiltin_cjson=true")
+    meson(
+        ctx,
+        extract(ctx, "rist"),
+        "-Dtest=false",
+        "-Dbuilt_tools=false",
+        "-Dbuiltin_cjson=true",
+    )
 
 
 def build_ssh(ctx: BuildContext) -> None:
-    cmake(
-        ctx,
-        extract(ctx, "ssh"),
-        "-DWITH_STATIC_LIB=ON",
+    def declare_windows_strndup(build_dir: Path) -> None:
+        if not ctx.target.windows:
+            return
+        with (build_dir / "config.h").open("a", encoding="utf-8") as config:
+            config.write("\n#include <stddef.h>\nchar *strndup(const char *, size_t);\n")
+
+    source = extract(ctx, "ssh")
+    args = [
         "-DWITH_EXAMPLES=OFF",
         "-DWITH_SERVER=OFF",
         "-DWITH_GCRYPT=OFF",
-    )
-
-
-def build_curl(ctx: BuildContext) -> None:
-    tls = (
-        ["-DCURL_USE_SCHANNEL=ON", "-DCURL_USE_OPENSSL=OFF"]
-        if ctx.target.windows
-        else ["-DCURL_USE_OPENSSL=ON"]
-    )
-    cmake(
-        ctx,
-        extract(ctx, "curl"),
-        "-DBUILD_CURL_EXE=OFF",
-        "-DBUILD_TESTING=OFF",
-        "-DCURL_USE_LIBPSL=OFF",
-        "-DCURL_ZSTD=OFF",
-        "-DCURL_BROTLI=OFF",
-        "-DCURL_DISABLE_LDAP=ON",
-        *tls,
+    ]
+    if ctx.target.windows:
+        args.append("-DHAVE_STRNDUP=YES")
+        cmake(ctx, source, *args, after_configure=declare_windows_strndup)
+    else:
+        cmake(ctx, source, *args)
+    private_libs = "-lpthread"
+    if ctx.target.windows:
+        private_libs += " -liphlpapi -lws2_32"
+    _set_pkg_config_fields(
+        ctx.prefix / "lib" / "pkgconfig" / "libssh.pc",
+        {
+            "Requires.private": "libssl libcrypto zlib",
+            "Cflags.private": "-DLIBSSH_STATIC",
+            "Libs.private": private_libs,
+        },
     )
 
 
@@ -773,18 +1006,26 @@ def build_amf(ctx: BuildContext) -> None:
     source = extract(ctx, "amf")
     include = ctx.prefix / "include" / "AMF"
     include.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(source / "amf" / "public" / "include", include, dirs_exist_ok=True)
+    shutil.copytree(source / "AMF", include, dirs_exist_ok=True)
 
 
 def build_vpl(ctx: BuildContext) -> None:
     cmake(
         ctx,
         extract(ctx, "vpl"),
+        "-DCMAKE_INSTALL_BINDIR=/bin",
+        "-DCMAKE_INSTALL_LIBDIR=/lib",
+        "-DCMAKE_INSTALL_INCLUDEDIR=/include",
+        "-DCMAKE_INSTALL_DATAROOTDIR=/share",
+        "-DCMAKE_INSTALL_DATADIR=/share",
+        "-DCMAKE_INSTALL_SYSCONFDIR=/etc",
         "-DINSTALL_EXAMPLES=OFF",
         "-DBUILD_TESTS=OFF",
         "-DBUILD_EXAMPLES=OFF",
-        "-DBUILD_TOOLS=OFF",
+        install_prefix="/",
+        install_destdir=ctx.prefix,
     )
+    _ensure_static_cpp_runtime(ctx, ctx.prefix / "lib" / "pkgconfig" / "vpl.pc")
 
 
 def build_placebo(ctx: BuildContext) -> None:
@@ -807,12 +1048,54 @@ def build_placebo(ctx: BuildContext) -> None:
         f"-Dvulkan-registry={ctx.prefix / 'share' / 'vulkan' / 'registry' / 'vk.xml'}",
         "-Dopengl=disabled",
         "-Dglslang=disabled",
-        "-Dshaderc=disabled",
+        "-Dshaderc=enabled",
         "-Ddemos=false",
         "-Dtests=false",
         "-Dbench=false",
         *platform,
     )
+    _ensure_static_cpp_runtime(ctx, ctx.prefix / "lib" / "pkgconfig" / "libplacebo.pc")
+
+
+def build_shaderc(ctx: BuildContext) -> None:
+    source = extract(ctx, "shaderc")
+    dependencies = {
+        "shaderc_abseil": source / "third_party" / "abseil_cpp",
+        "shaderc_effcee": source / "third_party" / "effcee",
+        "shaderc_glslang": source / "third_party" / "glslang",
+        "shaderc_googletest": source / "third_party" / "googletest",
+        "shaderc_re2": source / "third_party" / "re2",
+        "shaderc_spirv_headers": source / "third_party" / "spirv-headers",
+        "shaderc_spirv_tools": source / "third_party" / "spirv-tools",
+    }
+    extracted = {name: extract(ctx, name) for name in dependencies}
+    for name, destination in dependencies.items():
+        shutil.copytree(extracted[name], destination, dirs_exist_ok=True)
+    shutil.copytree(
+        extracted["shaderc_spirv_headers"] / "include" / "spirv" / "unified1",
+        ctx.prefix / "include" / "spirv-headers",
+        dirs_exist_ok=True,
+    )
+    cmake(
+        ctx,
+        source,
+        "-DSHADERC_SKIP_TESTS=ON",
+        "-DSHADERC_SKIP_EXAMPLES=ON",
+        "-DSHADERC_SKIP_COPYRIGHT_CHECK=ON",
+        "-DENABLE_EXCEPTIONS=ON",
+        "-DENABLE_GLSLANG_BINARIES=OFF",
+        "-DSPIRV_SKIP_EXECUTABLES=ON",
+        "-DSPIRV_TOOLS_BUILD_STATIC=ON",
+    )
+    for directory in (ctx.prefix / "lib", ctx.prefix / "bin"):
+        for pattern in ("*shaderc_shared*", "*SPIRV-Tools-shared*", "glslc", "glslc.exe"):
+            for path in directory.glob(pattern):
+                path.unlink()
+    build_dir = ctx.work_root / source.name
+    shutil.copy2(build_dir / "libshaderc_util" / "libshaderc_util.a", ctx.prefix / "lib")
+    combined = ctx.prefix / "lib" / "pkgconfig" / "shaderc_combined.pc"
+    _ensure_static_cpp_runtime(ctx, combined)
+    shutil.copy2(combined, ctx.prefix / "lib" / "pkgconfig" / "shaderc.pc")
 
 
 def build_fdk_aac(ctx: BuildContext) -> None:
@@ -866,8 +1149,8 @@ RECIPES: tuple[Recipe, ...] = (
     ("vulkan-loader", not_macos, build_vulkan_loader),
     ("opencl-headers", not_macos, build_opencl_headers),
     ("opencl-loader", not_macos, build_opencl_loader),
-    ("libdrm", linux, build_libdrm),
     ("Implib.so", linux, prepare_implib),
+    ("libdrm", linux, build_libdrm),
     ("libva", linux, build_libva),
     ("libpng", always, build_png),
     ("freetype", always, build_freetype),
@@ -914,7 +1197,6 @@ RECIPES: tuple[Recipe, ...] = (
     ("srt", always, build_srt),
     ("rist", always, build_rist),
     ("ssh", lambda ctx: ctx.target.name != "windows-arm64", build_ssh),
-    ("curl", always, build_curl),
     (
         "nv-codec-headers",
         lambda ctx: not_macos(ctx) and ctx.target.name != "windows-arm64",
@@ -922,6 +1204,7 @@ RECIPES: tuple[Recipe, ...] = (
     ),
     ("amf-headers", lambda ctx: not_macos(ctx) and x86(ctx), build_amf),
     ("oneVPL", lambda ctx: not_macos(ctx) and x86(ctx), build_vpl),
+    ("shaderc", always, build_shaderc),
     ("libplacebo", always, build_placebo),
     ("fdk-aac", fdk, build_fdk_aac),
 )

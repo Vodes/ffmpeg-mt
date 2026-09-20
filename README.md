@@ -16,7 +16,7 @@ Silicon. FFmpeg and every linked third-party input are checksum-pinned in
 
 The curated codec/filter surface includes AV1, H.264/H.265, VP8/VP9, Opus,
 MP3, LC3, VMAF, zimg, libplacebo, subtitles/font shaping, SVG/LV2, DVD and
-Blu-ray, ARIB captions, JPEG 2000, WebP, OpenAL, SRT, RIST, SSH/cURL, QR
+Blu-ray, ARIB captions, JPEG 2000, WebP, OpenAL, SRT, RIST, SSH, QR
 encoding/decoding, and libmysofa. Whisper is omitted because of its build and
 binary-size cost.
 

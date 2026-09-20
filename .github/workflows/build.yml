@@ -27,15 +27,19 @@ jobs:
           - target: linux-x86_64
             runner: ubuntu-24.04
             container: true
+            image_stage: linux_builder
           - target: windows-x86_64
             runner: ubuntu-24.04
             container: true
+            image_stage: builder
           - target: linux-arm64
             runner: ubuntu-24.04-arm
             container: true
+            image_stage: linux_builder
           - target: windows-arm64
             runner: ubuntu-24.04-arm
             container: true
+            image_stage: builder
           - target: macos-arm64
             runner: macos-15
             container: false
@@ -64,6 +68,7 @@ jobs:
         with:
           context: .
           file: docker/Dockerfile
+          target: ${{ matrix.image_stage }}
           tags: ffmpeg-mt-builder:almalinux9
           load: true
           cache-from: type=gha,scope=builder-${{ runner.arch }}

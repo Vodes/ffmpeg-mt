@@ -17,3 +17,4 @@ context/
 # Documentation output and cache
 site/
 .cache/
+AGENTS.md

@@ -5,9 +5,9 @@ configure = [
   "--enable-libx264", "--enable-libx265", "--enable-libzimg", "--enable-libbluray",
   "--enable-libdvdnav", "--enable-libxml2", "--enable-libaribcaption", "--enable-lv2",
 ]
-encoders = ["libaom-av1", "liblc3", "libmp3lame", "libopus", "libsvtav1", "libvpx-vp9", "libx264", "libx265"]
-decoders = ["libdav1d", "liblc3", "libopenjpeg", "libvpx-vp9"]
-filters = ["ass", "libplacebo", "libvmaf", "lv2", "qrencode", "qrdecode", "rubberband", "sofalizer", "zscale"]
+encoders = ["libaom-av1", "liblc3", "libmp3lame", "libopenjpeg", "libopus", "libsvtav1", "libvpx-vp9", "libx264", "libx265"]
+decoders = ["jpeg2000", "libdav1d", "liblc3", "libvpx-vp9"]
+filters = ["ass", "libplacebo", "libvmaf", "lv2", "qrencode", "quirc", "rubberband", "sofalizer", "zscale"]
 protocols = ["https", "rist", "srt"]
 
 [targets.linux-x86_64]
