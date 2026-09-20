@@ -136,7 +136,7 @@ class BuildContext:
             env.setdefault("CXX", "ccache clang++" if self.target.macos else "ccache g++")
             env.setdefault("AR", "ar")
             env.setdefault("RANLIB", "ranlib")
-        if not self.target.macos:
+        if self.target.linux:
             env["LDFLAGS"] += " -static-libgcc -static-libstdc++"
         return env
 

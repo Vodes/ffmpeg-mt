@@ -797,11 +797,15 @@ def test_environment_excludes_host_pkg_config(tmp_path: Path) -> None:
     ]
     assert "-fPIC" in env["CFLAGS"]
     assert "-fPIC" in env["CXXFLAGS"]
+    assert "-static-libgcc" in env["LDFLAGS"]
+    assert "-static-libstdc++" in env["LDFLAGS"]
     assert "--remap-path-prefix=/opt/homebrew=." not in env["RUSTFLAGS"]
 
     windows_env = context(tmp_path, "windows-x86_64").env()
     assert "-fPIC" not in windows_env["CFLAGS"]
     assert "-fPIC" not in windows_env["CXXFLAGS"]
+    assert "-static-libgcc" not in windows_env["LDFLAGS"]
+    assert "-static-libstdc++" not in windows_env["LDFLAGS"]
 
     macos_env = context(tmp_path, "macos-arm64").env()
     assert "--remap-path-prefix=/opt/homebrew=." in macos_env["RUSTFLAGS"]
