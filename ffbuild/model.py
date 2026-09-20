@@ -86,6 +86,9 @@ class BuildContext:
     def env(self) -> dict[str, str]:
         prefix = str(self.prefix)
         maps = f"-ffile-prefix-map={self.root}=. -fdebug-prefix-map={self.root}=."
+        rustflags = f"--remap-path-prefix={self.root}=."
+        if self.target.macos:
+            rustflags += " --remap-path-prefix=/opt/homebrew=."
         env = dict(os.environ)
         pic = " -fPIC" if not self.target.windows else ""
         env.update(
@@ -102,7 +105,7 @@ class BuildContext:
                 "FFMPEG_MT_PREFIX": prefix,
                 "CCACHE_DIR": str(self.root / ".cache" / "ccache"),
                 "CARGO_HOME": str(self.root / ".cache" / "cargo"),
-                "RUSTFLAGS": f"--remap-path-prefix={self.root}=.",
+                "RUSTFLAGS": rustflags,
                 "CPPFLAGS": f"-I{prefix}/include",
                 "CFLAGS": f"-O2 {maps}{pic}",
                 "CXXFLAGS": f"-O2 {maps}{pic}",

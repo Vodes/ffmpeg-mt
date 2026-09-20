@@ -63,7 +63,13 @@ def build_zlib(ctx: BuildContext) -> None:
 
 def build_xz(ctx: BuildContext) -> None:
     cmake(
-        ctx, extract(ctx, "xz"), "-DXZ_TOOL_XZ=OFF", "-DXZ_TOOL_XZDEC=OFF", "-DXZ_TOOL_LZMADEC=OFF"
+        ctx,
+        extract(ctx, "xz"),
+        "-DXZ_NLS=OFF",
+        "-DXZ_TOOL_XZ=OFF",
+        "-DXZ_TOOL_XZDEC=OFF",
+        "-DXZ_TOOL_LZMADEC=OFF",
+        "-DXZ_TOOL_LZMAINFO=OFF",
     )
 
 
@@ -221,9 +227,20 @@ def build_openal(ctx: BuildContext) -> None:
 
 
 def build_rubberband(ctx: BuildContext) -> None:
+    source = extract(ctx, "rubberband")
+    if ctx.target.macos:
+        mathmisc_header = source / "src" / "common" / "mathmisc.h"
+        header_text = mathmisc_header.read_text(encoding="utf-8")
+        sysutils_include = '#include "sysutils.h"\n'
+        if header_text.count(sysutils_include) != 1:
+            raise RuntimeError("Rubber Band mathmisc.h has an unexpected include layout")
+        mathmisc_header.write_text(
+            header_text.replace(sysutils_include, sysutils_include + "#include <cstddef>\n", 1),
+            encoding="utf-8",
+        )
     meson(
         ctx,
-        extract(ctx, "rubberband"),
+        source,
         "-Dfft=builtin",
         "-Dresampler=builtin",
         "-Djni=disabled",
@@ -246,7 +263,6 @@ def build_soxr(ctx: BuildContext) -> None:
         "-DWITH_OPENMP=OFF",
         "-DBUILD_TESTS=OFF",
         "-DBUILD_EXAMPLES=OFF",
-        "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
     )
     pc = ctx.prefix / "lib" / "pkgconfig"
     pc.mkdir(exist_ok=True)
@@ -396,6 +412,12 @@ def build_pango(ctx: BuildContext) -> None:
 
 def build_rsvg(ctx: BuildContext) -> None:
     source = extract(ctx, "rsvg")
+    meson_build = source / "meson.build"
+    meson_text = meson_build.read_text(encoding="utf-8")
+    rsvg_convert_subdir = "subdir('rsvg_convert')\n"
+    if meson_text.count(rsvg_convert_subdir) != 1:
+        raise RuntimeError("librsvg's rsvg-convert Meson subdirectory was not found exactly once")
+    meson_build.write_text(meson_text.replace(rsvg_convert_subdir, ""), encoding="utf-8")
     vendor = source / "vendor"
     config = run(
         "cargo",
@@ -713,15 +735,20 @@ def build_fontconfig(ctx: BuildContext) -> None:
 
 
 def build_harfbuzz(ctx: BuildContext) -> None:
-    meson(
-        ctx,
-        extract(ctx, "harfbuzz"),
+    args = [
         "-Dtests=disabled",
         "-Ddocs=disabled",
         "-Dutilities=disabled",
         "-Dglib=disabled",
         "-Dgobject=disabled",
         "-Dcairo=disabled",
+    ]
+    if ctx.target.macos:
+        args.append("-Dcoretext=enabled")
+    meson(
+        ctx,
+        extract(ctx, "harfbuzz"),
+        *args,
     )
 
 
@@ -815,6 +842,7 @@ def build_webp(ctx: BuildContext) -> None:
     cmake(
         ctx,
         extract(ctx, "webp"),
+        "-DWEBP_BUILD_EXTRAS=OFF",
         "-DWEBP_BUILD_ANIM_UTILS=OFF",
         "-DWEBP_BUILD_CWEBP=OFF",
         "-DWEBP_BUILD_DWEBP=OFF",
@@ -978,6 +1006,7 @@ def build_ssh(ctx: BuildContext) -> None:
         "-DWITH_EXAMPLES=OFF",
         "-DWITH_SERVER=OFF",
         "-DWITH_GCRYPT=OFF",
+        "-DWITH_GSSAPI=OFF",
     ]
     if ctx.target.windows:
         args.append("-DHAVE_STRNDUP=YES")
@@ -1030,6 +1059,7 @@ def build_vpl(ctx: BuildContext) -> None:
 
 def build_placebo(ctx: BuildContext) -> None:
     source = extract(ctx, "placebo")
+    # Meson must run on Python 3.12; 3.14 rejects libplacebo's VkXML(ET.parse(...)).
     submodules = {
         "placebo_vulkan": source / "3rdparty" / "Vulkan-Headers",
         "placebo_fast_float": source / "3rdparty" / "fast_float",
@@ -1111,6 +1141,10 @@ def install_moltenvk(ctx: BuildContext) -> None:
         raise FileNotFoundError("MoltenVK static XCFramework arm64 slice was not found")
     (ctx.prefix / "lib").mkdir(exist_ok=True)
     shutil.copy2(candidates[0], ctx.prefix / "lib" / "libMoltenVK.a")
+    vulkan_alias = ctx.prefix / "lib" / "libvulkan.a"
+    if vulkan_alias.exists() or vulkan_alias.is_symlink():
+        vulkan_alias.unlink()
+    vulkan_alias.symlink_to("libMoltenVK.a")
     headers = source / "MoltenVK" / "include"
     if not headers.is_dir():
         raise FileNotFoundError("MoltenVK headers were not found")
@@ -1120,7 +1154,7 @@ def install_moltenvk(ctx: BuildContext) -> None:
     (pc / "vulkan.pc").write_text(
         f"prefix={ctx.prefix}\nlibdir=${{prefix}}/lib\nincludedir=${{prefix}}/include\n\n"
         "Name: Vulkan\nDescription: MoltenVK static Vulkan implementation\nVersion: 1.4.2\n"
-        "Libs: -L${libdir} -lMoltenVK\n"
+        "Libs: -L${libdir} -lvulkan\n"
         "Libs.private: -lc++ -framework Metal -framework Foundation -framework QuartzCore "
         "-framework CoreGraphics -framework IOSurface -framework IOKit -framework AppKit\n"
         "Cflags: -I${includedir}\n",

@@ -80,7 +80,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=builder-${{ runner.arch }}
       - name: Install macOS build tools
         if: ${{ !matrix.container }}
-        run: brew install autoconf automake cargo-c ccache cmake libtool meson nasm ninja pkg-config rust shaderc zstd
+        run: brew install autoconf automake cargo-c ccache cmake libtool nasm ninja pkg-config rust shaderc zstd
       - name: Build in manylinux_2_34
         if: ${{ matrix.container }}
         env:

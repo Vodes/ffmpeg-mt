@@ -73,6 +73,17 @@ def test_target_matrix_is_exact() -> None:
     )
 
 
+def test_cmake_enables_legacy_policy_compatibility(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[object, ...]] = []
+    monkeypatch.setattr(helpers, "run", lambda *args, **_kwargs: calls.append(args))
+
+    helpers.cmake(context(tmp_path, "macos-arm64"), tmp_path / "source")
+
+    assert "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" in calls[0]
+
+
 def test_third_party_workflow_actions_are_commit_pinned() -> None:
     for workflow in (ROOT / ".github" / "workflows").glob("*.yml"):
         for line in workflow.read_text(encoding="utf-8").splitlines():
@@ -95,6 +106,100 @@ def test_shaderc_builder_builds_the_glslc_executable_target() -> None:
     dockerfile = (ROOT / "docker" / "Dockerfile").read_text(encoding="utf-8")
     assert "cmake --build build --target glslc_exe --parallel" in dockerfile
     assert "install -m 0755 build/glslc/glslc /usr/local/bin/glslc" in dockerfile
+
+
+def test_xz_disables_host_localized_tools(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ctx = context(tmp_path, "macos-arm64")
+    source = tmp_path / "xz"
+    source.mkdir()
+    calls: list[tuple[object, ...]] = []
+    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
+    monkeypatch.setattr(recipes, "cmake", lambda *args, **_kwargs: calls.append(args))
+
+    recipes.build_xz(ctx)
+
+    assert calls == [
+        (
+            ctx,
+            source,
+            "-DXZ_NLS=OFF",
+            "-DXZ_TOOL_XZ=OFF",
+            "-DXZ_TOOL_XZDEC=OFF",
+            "-DXZ_TOOL_LZMADEC=OFF",
+            "-DXZ_TOOL_LZMAINFO=OFF",
+        )
+    ]
+
+
+def test_webp_disables_utilities_and_extras(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = context(tmp_path, "macos-arm64")
+    source = tmp_path / "webp"
+    source.mkdir()
+    calls: list[tuple[object, ...]] = []
+    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
+    monkeypatch.setattr(recipes, "cmake", lambda *args, **_kwargs: calls.append(args))
+
+    recipes.build_webp(ctx)
+
+    assert calls == [
+        (
+            ctx,
+            source,
+            "-DWEBP_BUILD_EXTRAS=OFF",
+            "-DWEBP_BUILD_ANIM_UTILS=OFF",
+            "-DWEBP_BUILD_CWEBP=OFF",
+            "-DWEBP_BUILD_DWEBP=OFF",
+            "-DWEBP_BUILD_GIF2WEBP=OFF",
+            "-DWEBP_BUILD_IMG2WEBP=OFF",
+            "-DWEBP_BUILD_VWEBP=OFF",
+            "-DWEBP_BUILD_WEBPINFO=OFF",
+            "-DWEBP_BUILD_WEBPMUX=OFF",
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    ("target", "coretext_enabled"),
+    [("linux-x86_64", False), ("macos-arm64", True)],
+)
+def test_harfbuzz_coretext_matches_target_platform(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, target: str, coretext_enabled: bool
+) -> None:
+    ctx = context(tmp_path, target)
+    source = tmp_path / "harfbuzz"
+    source.mkdir()
+    calls: list[tuple[object, ...]] = []
+    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
+    monkeypatch.setattr(recipes, "meson", lambda *args, **_kwargs: calls.append(args))
+
+    recipes.build_harfbuzz(ctx)
+
+    assert ("-Dcoretext=enabled" in calls[0]) is coretext_enabled
+
+
+def test_moltenvk_installs_vulkan_loader_alias(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = context(tmp_path, "macos-arm64")
+    source = tmp_path / "moltenvk"
+    library = source / "MoltenVK.xcframework" / "macos-arm64" / "libMoltenVK.a"
+    library.parent.mkdir(parents=True)
+    library.write_bytes(b"moltenvk")
+    (source / "MoltenVK" / "include").mkdir(parents=True)
+    ctx.prefix.mkdir(parents=True)
+    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
+
+    recipes.install_moltenvk(ctx)
+
+    alias = ctx.prefix / "lib" / "libvulkan.a"
+    assert alias.is_symlink()
+    assert alias.readlink() == Path("libMoltenVK.a")
+    assert alias.resolve().read_bytes() == b"moltenvk"
+    pkg_config = (ctx.prefix / "lib" / "pkgconfig" / "vulkan.pc").read_text(encoding="utf-8")
+    assert "Libs: -L${libdir} -lvulkan\n" in pkg_config
+    assert "Libs.private: -lc++ -framework Metal" in pkg_config
 
 
 def test_target_shaderc_installs_static_metadata_and_spirv_headers(
@@ -676,6 +781,29 @@ def test_current_rsvg_and_gnutls_options_are_supported() -> None:
     assert "--disable-guile" not in gnutls_source
 
 
+def test_rsvg_build_omits_unneeded_converter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = context(tmp_path, "macos-arm64")
+    source = tmp_path / "librsvg"
+    source.mkdir()
+    meson_build = source / "meson.build"
+    meson_build.write_text("subdir('rsvg')\nsubdir('rsvg_convert')\n", encoding="utf-8")
+    meson_calls: list[tuple[object, ...]] = []
+    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
+    monkeypatch.setattr(
+        recipes,
+        "run",
+        lambda *_args, **_kwargs: 'source = "vendor"\n',
+    )
+    monkeypatch.setattr(recipes, "meson", lambda *args: meson_calls.append(args))
+
+    recipes.build_rsvg(ctx)
+
+    assert meson_build.read_text(encoding="utf-8") == "subdir('rsvg')\n"
+    assert meson_calls[0][1] == source
+
+
 def test_audited_recipe_options_are_current() -> None:
     svt_source = inspect.getsource(recipes.build_svtav1)
     assert "BUILD_DEC" not in svt_source
@@ -698,16 +826,19 @@ def test_libssh_static_pkg_config_metadata(tmp_path: Path, monkeypatch: pytest.M
     source = tmp_path / "libssh"
     source.mkdir()
     pkg_config = ctx.prefix / "lib" / "pkgconfig" / "libssh.pc"
+    cmake_calls: list[tuple[object, ...]] = []
 
     monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
 
-    def fake_cmake(*_args: object) -> None:
+    def fake_cmake(*args: object) -> None:
+        cmake_calls.append(args)
         pkg_config.parent.mkdir(parents=True)
         pkg_config.write_text("Name: libssh\nLibs: -lssh\n", encoding="utf-8")
 
     monkeypatch.setattr(recipes, "cmake", fake_cmake)
     recipes.build_ssh(ctx)
 
+    assert "-DWITH_GSSAPI=OFF" in cmake_calls[0]
     metadata = pkg_config.read_text(encoding="utf-8")
     assert "Requires.private: libssl libcrypto zlib" in metadata
     assert "Cflags.private: -DLIBSSH_STATIC" in metadata
@@ -913,6 +1044,28 @@ def test_rubberband_declares_its_private_math_dependency(
     assert "Libs.private: -lm -lstdc++\n" in pkg_config.read_text(encoding="utf-8")
 
 
+def test_rubberband_macos_includes_cstddef_for_libcxx(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = context(tmp_path, "macos-arm64")
+    source = tmp_path / "rubberband"
+    header = source / "src" / "common" / "mathmisc.h"
+    header.parent.mkdir(parents=True)
+    header.write_text('#include "sysutils.h"\n', encoding="utf-8")
+    pkg_config = ctx.prefix / "lib" / "pkgconfig" / "rubberband.pc"
+    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
+
+    def fake_meson(*_args: object) -> None:
+        pkg_config.parent.mkdir(parents=True)
+        pkg_config.write_text("Libs: -lrubberband\n", encoding="utf-8")
+
+    monkeypatch.setattr(recipes, "meson", fake_meson)
+
+    recipes.build_rubberband(ctx)
+
+    assert header.read_text(encoding="utf-8") == '#include "sysutils.h"\n#include <cstddef>\n'
+
+
 def test_linux_ffmpeg_links_the_math_library_for_static_dependency_probes(
     tmp_path: Path,
 ) -> None:
@@ -1032,10 +1185,14 @@ def test_environment_excludes_host_pkg_config(tmp_path: Path) -> None:
     ]
     assert "-fPIC" in env["CFLAGS"]
     assert "-fPIC" in env["CXXFLAGS"]
+    assert "--remap-path-prefix=/opt/homebrew=." not in env["RUSTFLAGS"]
 
     windows_env = context(tmp_path, "windows-x86_64").env()
     assert "-fPIC" not in windows_env["CFLAGS"]
     assert "-fPIC" not in windows_env["CXXFLAGS"]
+
+    macos_env = context(tmp_path, "macos-arm64").env()
+    assert "--remap-path-prefix=/opt/homebrew=." in macos_env["RUSTFLAGS"]
 
 
 def test_lock_has_valid_checksums_and_license_metadata() -> None:

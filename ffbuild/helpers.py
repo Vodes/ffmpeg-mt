@@ -188,6 +188,7 @@ def cmake(
         f"-DCMAKE_INSTALL_PREFIX={selected_prefix}",
         "-DCMAKE_INSTALL_LIBDIR=lib",
         "-DCMAKE_BUILD_TYPE=Release",
+        "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
         "-DBUILD_SHARED_LIBS=OFF",
         "-DCMAKE_C_COMPILER_LAUNCHER=ccache",
         "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache",
