@@ -40,7 +40,7 @@ reproducible rebuild.
 The corresponding-source archive is produced with:
 
 ```console
-uv run python scripts/source_archive.py
+uv run python -m scripts.source_archive
 ```
 
 The build validates target architecture, expected features, runtime-library
