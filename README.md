@@ -40,7 +40,8 @@ uv run python scripts/source_archive.py
 
 The build validates target architecture, expected features, runtime-library
 allowlists, the Linux glibc 2.34 ceiling, macOS 12 deployment metadata, and
-leaked host/build paths. Native jobs also execute a generated A/V smoke test.
+leaked host/build paths. CI executes every packaged binary on a matching native
+runner and performs a generated A/V encode-and-probe smoke test.
 Linux VAAPI uses pinned Implib.so lazy import shims on both architectures: no
 libva or libva-drm shared object is packaged or added to `DT_NEEDED`, while a
 host with a compatible VAAPI runtime and driver can load them when VAAPI is

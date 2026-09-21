@@ -28,25 +28,31 @@ jobs:
             runner: ubuntu-24.04
             container: true
             image_stage: linux_builder
+            image_name: manylinux_2_34_x86_64
             base_image: quay.io/pypa/manylinux_2_34_x86_64@sha256:0b4acc5b3c4c797bb9a6286c4d15039962f61ee0c5426753afd5cbe45baebfc4
           - target: windows-x86_64
             runner: ubuntu-24.04
             container: true
             image_stage: builder
+            image_name: manylinux_2_34_x86_64
             base_image: quay.io/pypa/manylinux_2_34_x86_64@sha256:0b4acc5b3c4c797bb9a6286c4d15039962f61ee0c5426753afd5cbe45baebfc4
           - target: linux-arm64
             runner: ubuntu-24.04-arm
             container: true
             image_stage: linux_builder
+            image_name: manylinux_2_34_aarch64
             base_image: quay.io/pypa/manylinux_2_34_aarch64@sha256:db1a485b015c1d9a6d7e2929367a69a6f772964be06cca8fe585f959a47ec0b7
           - target: windows-arm64
             runner: ubuntu-24.04-arm
             container: true
             image_stage: builder
+            image_name: manylinux_2_34_aarch64
             base_image: quay.io/pypa/manylinux_2_34_aarch64@sha256:db1a485b015c1d9a6d7e2929367a69a6f772964be06cca8fe585f959a47ec0b7
           - target: macos-arm64
             runner: macos-15
             container: false
+            image_name: native
+    name: build (${{ matrix.target }}, ${{ matrix.image_name }} on ${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7.0.1
@@ -106,9 +112,107 @@ jobs:
           name: ffmpeg-${{ matrix.target }}-nonfree
           path: dist/*
 
+  windows-smoke:
+    if: ${{ !inputs.with_fdk_aac || github.event.repository.private }}
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: windows-x86_64
+            runner: windows-2025
+          - target: windows-arm64
+            runner: windows-11-vs2026-arm
+    name: smoke (${{ matrix.target }} on ${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: ffmpeg-${{ matrix.target }}${{ inputs.with_fdk_aac && '-nonfree' || '' }}
+          path: artifact
+      - name: Extract artifact
+        shell: pwsh
+        run: |
+          $archive = Get-ChildItem -Path artifact -Filter '*.tar.zst' -File | Select-Object -First 1
+          if ($null -eq $archive) {
+            throw 'The build artifact does not contain a .tar.zst archive.'
+          }
+
+          $extract = Join-Path $PWD 'package'
+          New-Item -ItemType Directory -Path $extract | Out-Null
+          $tar = Join-Path $extract $archive.BaseName
+
+          if ($null -eq (Get-Command zstd.exe -ErrorAction SilentlyContinue)) {
+            throw 'zstd is required to extract the build artifact.'
+          }
+          if ($null -eq (Get-Command tar.exe -ErrorAction SilentlyContinue)) {
+            throw 'tar is required to extract the build artifact.'
+          }
+
+          & zstd.exe -d -f $archive.FullName -o $tar
+          if ($LASTEXITCODE -ne 0) {
+            throw "zstd failed with exit code $LASTEXITCODE."
+          }
+          & tar.exe -xf $tar -C $extract
+          if ($LASTEXITCODE -ne 0) {
+            throw "tar failed with exit code $LASTEXITCODE."
+          }
+
+          $ffmpeg = Get-ChildItem -Path $extract -Filter 'ffmpeg.exe' -File -Recurse | Select-Object -First 1
+          $ffprobe = Get-ChildItem -Path $extract -Filter 'ffprobe.exe' -File -Recurse | Select-Object -First 1
+          if ($null -eq $ffmpeg -or $null -eq $ffprobe) {
+            throw 'The extracted artifact does not contain ffmpeg.exe and ffprobe.exe.'
+          }
+          "FFMPEG_BIN=$($ffmpeg.Directory.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Inspect native build
+        shell: pwsh
+        run: |
+          & "$env:FFMPEG_BIN\ffmpeg.exe" -version
+          if ($LASTEXITCODE -ne 0) {
+            throw "ffmpeg -version failed with exit code $LASTEXITCODE."
+          }
+          & "$env:FFMPEG_BIN\ffmpeg.exe" -codecs
+          if ($LASTEXITCODE -ne 0) {
+            throw "ffmpeg -codecs failed with exit code $LASTEXITCODE."
+          }
+          & "$env:FFMPEG_BIN\ffmpeg.exe" -hwaccels
+          if ($LASTEXITCODE -ne 0) {
+            throw "ffmpeg -hwaccels failed with exit code $LASTEXITCODE."
+          }
+          & "$env:FFMPEG_BIN\ffmpeg.exe" -protocols
+          if ($LASTEXITCODE -ne 0) {
+            throw "ffmpeg -protocols failed with exit code $LASTEXITCODE."
+          }
+          & "$env:FFMPEG_BIN\ffprobe.exe" -version
+          if ($LASTEXITCODE -ne 0) {
+            throw "ffprobe -version failed with exit code $LASTEXITCODE."
+          }
+      - name: Encode and probe a sample
+        shell: pwsh
+        run: |
+          $sample = Join-Path $env:RUNNER_TEMP 'smoke.mkv'
+          & "$env:FFMPEG_BIN\ffmpeg.exe" `
+            -hide_banner -loglevel error `
+            -f lavfi -i 'testsrc2=duration=1:size=128x72:rate=10' `
+            -f lavfi -i 'sine=frequency=1000:duration=1' `
+            -c:v mpeg4 -c:a aac -y $sample
+          if ($LASTEXITCODE -ne 0) {
+            throw "ffmpeg smoke encode failed with exit code $LASTEXITCODE."
+          }
+
+          $probe = & "$env:FFMPEG_BIN\ffprobe.exe" `
+            -v error -show_streams -of json $sample | Out-String
+          if ($LASTEXITCODE -ne 0) {
+            throw "ffprobe smoke inspection failed with exit code $LASTEXITCODE."
+          }
+          $types = @((ConvertFrom-Json $probe).streams | ForEach-Object { $_.codec_type })
+          if ($types -notcontains 'video' -or $types -notcontains 'audio') {
+            throw "ffprobe did not report both audio and video streams: $probe"
+          }
+
   release:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.release && !inputs.with_fdk_aac }}
-    needs: build
+    needs: [build, windows-smoke]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
