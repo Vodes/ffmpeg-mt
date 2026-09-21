@@ -36,6 +36,44 @@ def _write_tar(source: Path, destination: Path, mtime: int) -> None:
             )
 
 
+def _copy_rust_toolchain_notices(notices: Path) -> None:
+    sysroot = Path(run("rustc", "--print", "sysroot", capture=True).strip())
+    roots: tuple[tuple[Path, str, tuple[str, ...] | None], ...] = (
+        (sysroot / "lib/rustlib/src/rust", "rust-src", ("COPYRIGHT*", "LICENSE*")),
+        (sysroot / "share/doc/rust", "rust-doc", ("COPYRIGHT-library*",)),
+        (sysroot / "share/doc/rust/licenses", "rust-toolchain-licenses", None),
+        (sysroot / "share/licenses/rust", "rust-distro-licenses", None),
+        (Path("/usr/share/licenses/rust"), "rust-system-licenses", None),
+    )
+    copied = 0
+    destination = notices / "rust-std"
+    seen: set[Path] = set()
+    for root, label, patterns in roots:
+        if not root.is_dir():
+            continue
+        if patterns is None:
+            candidates = (item for item in sorted(root.rglob("*")) if item.is_file())
+        else:
+            candidates = (
+                item
+                for pattern in patterns
+                for item in sorted(root.glob(pattern))
+                if item.is_file()
+            )
+        for source in candidates:
+            if source in seen:
+                continue
+            seen.add(source)
+            target = destination / label / source.relative_to(root)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+            copied += 1
+    if copied == 0:
+        raise FileNotFoundError(
+            f"Rust standard-library/toolchain licenses were not found under {sysroot}"
+        )
+
+
 def package(ctx: BuildContext, revision: int, flags: list[str]) -> Path:
     name = artifact_name(ctx)
     root_name = name.removesuffix(".tar.zst")
@@ -60,13 +98,19 @@ def package(ctx: BuildContext, revision: int, flags: list[str]) -> Path:
                 copy_license_files(
                     ctx.source_dirs[source_name], source_info.license_files, notices / source_name
                 )
-        if "rsvg" in included:
+        cargo_sources = {
+            "rsvg": ("librsvg-Cargo.lock", "Cargo.lock"),
+            "dovi": ("libdovi-Cargo.lock", "dolby_vision/Cargo.lock"),
+        }
+        for source_name, (lock_name, lock_source) in cargo_sources.items():
+            if source_name not in included:
+                continue
             lock_dir = staging / "source-locks"
-            lock_dir.mkdir()
-            shutil.copy2(ctx.source_dirs["rsvg"] / "Cargo.lock", lock_dir / "librsvg-Cargo.lock")
-            crate_notices = notices / "rsvg-rust-crates"
+            lock_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ctx.source_dirs[source_name] / lock_source, lock_dir / lock_name)
+            crate_notices = notices / f"{source_name}-rust-crates"
             copied_crate_notices = 0
-            for crate in sorted((ctx.source_dirs["rsvg"] / "vendor").iterdir()):
+            for crate in sorted((ctx.source_dirs[source_name] / "vendor").iterdir()):
                 if not crate.is_dir():
                     continue
                 for pattern in ("LICENSE*", "COPYING*", "NOTICE*", "UNLICENSE"):
@@ -78,7 +122,11 @@ def package(ctx: BuildContext, revision: int, flags: list[str]) -> Path:
                         shutil.copy2(license_file, destination)
                         copied_crate_notices += 1
             if copied_crate_notices == 0:
-                raise FileNotFoundError("no license notices found in vendored librsvg crates")
+                raise FileNotFoundError(
+                    f"no license notices found in vendored {source_name} crates"
+                )
+        if included.intersection(cargo_sources):
+            _copy_rust_toolchain_notices(notices)
         source_records = []
         for item in sorted(included):
             source = ctx.sources[item]
@@ -89,8 +137,12 @@ def package(ctx: BuildContext, revision: int, flags: list[str]) -> Path:
                 "sha256": source.sha256,
                 "license": source.license,
             }
-            if item == "rsvg":
-                record["nested_lock"] = "source-locks/librsvg-Cargo.lock"
+            nested_locks = {
+                "rsvg": "source-locks/librsvg-Cargo.lock",
+                "dovi": "source-locks/libdovi-Cargo.lock",
+            }
+            if item in nested_locks:
+                record["nested_lock"] = nested_locks[item]
             source_records.append(record)
         metadata = {
             "artifact": name,

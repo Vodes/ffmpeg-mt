@@ -6,12 +6,37 @@ FROM ${MANYLINUX_IMAGE} AS packages
 RUN dnf -y install dnf-plugins-core epel-release && \
     dnf config-manager --set-enabled crb && \
     dnf -y install \
-      autoconf automake bison bzip2 cargo cargo-c ccache clang cmake diffutils file findutils \
+      autoconf automake bison bzip2 cargo-c ccache clang cmake diffutils file findutils \
       flex gcc gcc-c++ git glibc-static gperf gzip libstdc++-static libtool make nasm ninja-build \
       patch perl rsync alsa-lib-devel \
-      pkgconf-pkg-config rust tar texinfo unzip vim-common which xz yasm zip zstd && \
+      pkgconf-pkg-config tar texinfo unzip vim-common which xz yasm zip zstd && \
     if [ "$(uname -m)" = x86_64 ]; then dnf -y install mesa-vulkan-drivers; fi && \
     dnf clean all
+
+ARG RUST_VERSION=1.92.0
+ARG RUSTUP_VERSION=1.28.2
+ARG RUSTUP_X86_64_SHA256=20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c
+ARG RUSTUP_AARCH64_SHA256=e3853c5a252fca15252d07cb23a1bdd9377a8c6f3efa01531109281ae47f841c
+ARG TARGETARCH
+ENV PATH=/root/.cargo/bin:${PATH}
+ENV RUSTUP_TOOLCHAIN=${RUST_VERSION}
+
+RUN case "${TARGETARCH}" in \
+      amd64) rust_arch=x86_64-unknown-linux-gnu; checksum="${RUSTUP_X86_64_SHA256}" ;; \
+      arm64) rust_arch=aarch64-unknown-linux-gnu; checksum="${RUSTUP_AARCH64_SHA256}" ;; \
+      *) echo "Unsupported Rust host architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
+    curl -fL --retry 5 \
+      -o /tmp/rustup-init \
+      "https://static.rust-lang.org/rustup/archive/${RUSTUP_VERSION}/${rust_arch}/rustup-init" && \
+    echo "${checksum}  /tmp/rustup-init" | sha256sum -c - && \
+    chmod 0755 /tmp/rustup-init && \
+    /tmp/rustup-init -y --default-toolchain none --profile minimal && \
+    rustup toolchain install "${RUST_VERSION}" --profile minimal --component rust-docs && \
+    rustup target add --toolchain "${RUST_VERSION}" \
+      x86_64-pc-windows-gnu aarch64-pc-windows-gnullvm && \
+    rustup default "${RUST_VERSION}" && \
+    rm -f /tmp/rustup-init
 
 FROM packages AS shader_tools
 

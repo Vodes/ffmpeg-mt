@@ -8,12 +8,14 @@ from pathlib import Path
 import pytest
 
 import ffbuild.helpers as helpers
+import ffbuild.package as package_module
 import ffbuild.recipes as recipes
 import ffbuild.validate as validation
 from ffbuild.ffmpeg import configure_flags
 from ffbuild.helpers import download, download_url, extract, fetch_text
 from ffbuild.model import BuildContext, Source, load_sources
 from ffbuild.package import (
+    _copy_rust_toolchain_notices,
     _write_tar,
     artifact_name,
 )
@@ -61,6 +63,56 @@ def test_archive_members_are_unique(tmp_path: Path) -> None:
         "artifact/licenses/dependency",
         "artifact/licenses/dependency/LICENSE",
     ]
+
+
+def test_windows_rust_toolchain_is_pinned_with_precompiled_targets() -> None:
+    dockerfile = (ROOT / "docker" / "Dockerfile").read_text(encoding="utf-8")
+
+    assert "ARG RUST_VERSION=1.92.0" in dockerfile
+    assert "ARG RUSTUP_VERSION=1.28.2" in dockerfile
+    assert "--component rust-docs" in dockerfile
+    assert "x86_64-pc-windows-gnu aarch64-pc-windows-gnullvm" in dockerfile
+    assert "rust-src" not in dockerfile
+
+
+def test_macos_uses_the_same_pinned_rustup_toolchain() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
+
+    assert 'RUST_VERSION: "1.92.0"' in workflow
+    assert 'RUSTUP_VERSION: "1.28.2"' in workflow
+    assert (
+        'RUSTUP_SHA256: "20ef5516c31b1ac2290084199ba77dbbcaa1406c45c1d978ca68558ef5964ef5"'
+        in workflow
+    )
+    assert "aarch64-apple-darwin/rustup-init" in workflow
+    assert "--profile minimal --component rust-docs" in workflow
+    assert "pkg-config rust shaderc" not in workflow
+
+
+def test_rust_toolchain_notices_include_std_and_registry_licenses(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sysroot = tmp_path / "sysroot"
+    rust_source = sysroot / "lib" / "rustlib" / "src" / "rust"
+    rust_source.mkdir(parents=True)
+    (rust_source / "COPYRIGHT").write_text("copyright\n", encoding="utf-8")
+    (rust_source / "LICENSE-APACHE").write_text("apache\n", encoding="utf-8")
+    (sysroot / "share" / "doc" / "rust" / "licenses").mkdir(parents=True)
+    (sysroot / "share" / "doc" / "rust" / "licenses" / "MIT.txt").write_text(
+        "mit\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        package_module,
+        "run",
+        lambda *_args, **_kwargs: f"{sysroot}\n",
+    )
+
+    destination = tmp_path / "licenses"
+    _copy_rust_toolchain_notices(destination)
+
+    assert (destination / "rust-std" / "rust-src" / "COPYRIGHT").read_text() == "copyright\n"
+    assert (destination / "rust-std" / "rust-src" / "LICENSE-APACHE").read_text() == "apache\n"
+    assert (destination / "rust-std" / "rust-toolchain-licenses" / "MIT.txt").read_text() == "mit\n"
 
 
 def test_windows_runtime_dependencies_ignore_export_name(
@@ -223,6 +275,7 @@ def test_dependency_order_and_predicates(tmp_path: Path, target: str) -> None:
     else:
         assert names.index("vulkan-headers") < names.index("libplacebo")
     assert names.index("shaderc") < names.index("libplacebo")
+    assert names.index("libdovi") < names.index("libplacebo")
     if target.startswith("windows-"):
         assert names.index("SPIRV-Cross") < names.index("libplacebo")
     else:
@@ -737,6 +790,70 @@ def test_onevpl_declares_its_static_cpp_runtime(
 
     assert cmake_kwargs == {"install_prefix": "/", "install_destdir": ctx.prefix}
     assert "Libs.private: -lstdc++\n" in pkg_config.read_text(encoding="utf-8")
+
+
+def test_libdovi_builds_a_static_c_api_for_libplacebo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = context(tmp_path, "windows-x86_64")
+    source = tmp_path / "dovi"
+    (source / "dolby_vision").mkdir(parents=True)
+    commands: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
+
+    def fake_run(*args: object, **kwargs: object) -> str:
+        commands.append((args, kwargs))
+        return '[source.vendored-sources]\ndirectory = "vendor"\n' if kwargs.get("capture") else ""
+
+    monkeypatch.setattr(recipes, "run", fake_run)
+
+    recipes.build_libdovi(ctx)
+
+    vendor_args = commands[0][0]
+    assert vendor_args[:3] == ("cargo", "vendor", "--locked")
+    assert "--sync" not in vendor_args
+    vendor_env = commands[0][1].get("env")
+    assert isinstance(vendor_env, dict)
+    assert "RUSTC_BOOTSTRAP" not in vendor_env
+    install_args = commands[-1][0]
+    assert install_args[:2] == ("cargo", "cinstall")
+    assert "--features=capi" in install_args
+    assert "--library-type=staticlib" in install_args
+    assert "--target=x86_64-pc-windows-gnu" in install_args
+    assert "-Z" not in install_args
+
+
+def test_libplacebo_enables_dolby_vision_support(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = context(tmp_path, "linux-x86_64")
+    source = tmp_path / "placebo"
+    source.mkdir()
+    submodules = {}
+    for name in (
+        "placebo_vulkan",
+        "placebo_fast_float",
+        "placebo_glad",
+        "placebo_jinja",
+        "placebo_markupsafe",
+    ):
+        submodule = tmp_path / name
+        submodule.mkdir()
+        submodules[name] = submodule
+    meson_calls: list[tuple[object, ...]] = []
+
+    def fake_extract(_ctx: BuildContext, name: str) -> Path:
+        return source if name == "placebo" else submodules[name]
+
+    monkeypatch.setattr(recipes, "extract", fake_extract)
+    monkeypatch.setattr(recipes, "meson", lambda *args: meson_calls.append(args))
+    monkeypatch.setattr(recipes, "_ensure_static_cpp_runtime", lambda *_args: None)
+
+    recipes.build_placebo(ctx)
+
+    assert "-Ddovi=enabled" in meson_calls[0]
+    assert "-Dlibdovi=enabled" in meson_calls[0]
 
 
 @pytest.mark.parametrize(

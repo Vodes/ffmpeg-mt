@@ -1051,6 +1051,49 @@ def build_vpl(ctx: BuildContext) -> None:
     _ensure_static_cpp_runtime(ctx, ctx.prefix / "lib" / "pkgconfig" / "vpl.pc")
 
 
+def build_libdovi(ctx: BuildContext) -> None:
+    source = extract(ctx, "dovi")
+    crate = source / "dolby_vision"
+    vendor = source / "vendor"
+    env = ctx.env()
+    config = run(
+        "cargo",
+        "vendor",
+        "--locked",
+        "--versioned-dirs",
+        vendor,
+        cwd=crate,
+        env=env,
+        capture=True,
+    )
+    cargo_home = Path(env["CARGO_HOME"])
+    cargo_home.mkdir(parents=True, exist_ok=True)
+    config = config.replace('directory = "vendor"', f'directory = "{vendor}"')
+    (cargo_home / "config.toml").write_text(config, encoding="utf-8")
+
+    arguments = [
+        "cinstall",
+        "--release",
+        "--locked",
+        "--features=capi",
+        "--library-type=staticlib",
+        f"--prefix={ctx.prefix}",
+        f"--libdir={ctx.prefix / 'lib'}",
+    ]
+    if ctx.target.windows:
+        rust_target = {
+            "windows-x86_64": "x86_64-pc-windows-gnu",
+            "windows-arm64": "aarch64-pc-windows-gnullvm",
+        }[ctx.target.name]
+        toolchain = Path(env.get("LLVM_MINGW_ROOT", "/opt/llvm-mingw"))
+        target_key = rust_target.upper().replace("-", "_")
+        env[f"CARGO_TARGET_{target_key}_LINKER"] = str(
+            toolchain / "bin" / f"{ctx.target.host}-clang"
+        )
+        arguments.append(f"--target={rust_target}")
+    run("cargo", *arguments, cwd=crate, env=env)
+
+
 def build_placebo(ctx: BuildContext) -> None:
     source = extract(ctx, "placebo")
     # Meson must run on Python 3.12; 3.14 rejects libplacebo's VkXML(ET.parse(...)).
@@ -1073,6 +1116,8 @@ def build_placebo(ctx: BuildContext) -> None:
         "-Dopengl=disabled",
         "-Dglslang=disabled",
         "-Dshaderc=enabled",
+        "-Ddovi=enabled",
+        "-Dlibdovi=enabled",
         "-Ddemos=false",
         "-Dtests=false",
         "-Dbench=false",
@@ -1261,6 +1306,7 @@ RECIPES: tuple[Recipe, ...] = (
     ),
     ("oneVPL", lambda ctx: not_macos(ctx) and x86(ctx), build_vpl),
     ("shaderc", always, build_shaderc),
+    ("libdovi", always, build_libdovi),
     ("SPIRV-Cross", windows, build_spirv_cross),
     ("libplacebo", always, build_placebo),
     ("fdk-aac", nonfree, build_fdk_aac),

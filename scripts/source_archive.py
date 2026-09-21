@@ -33,20 +33,23 @@ def main() -> None:
         for source in sources.values():
             archive = download(source, root / ".cache" / "downloads")
             shutil.copy2(archive, archives)
-            if source.name == "rsvg":
-                cargo_source = Path(temporary) / "rsvg-source"
+            if source.name in {"rsvg", "dovi"}:
+                cargo_source = Path(temporary) / f"{source.name}-source"
                 cargo_source.mkdir()
-                extract_tar(archive, cargo_source, "rsvg")
+                extract_tar(archive, cargo_source, source.name)
                 source_root = next(cargo_source.iterdir())
+                manifest_dir = (
+                    source_root / "dolby_vision" if source.name == "dovi" else source_root
+                )
                 subprocess.run(
                     [
                         "cargo",
                         "vendor",
                         "--locked",
                         "--versioned-dirs",
-                        str(archives / "rsvg-cargo-vendor"),
+                        str(archives / f"{source.name}-cargo-vendor"),
                     ],
-                    cwd=source_root,
+                    cwd=manifest_dir,
                     check=True,
                 )
         tracked = subprocess.run(
