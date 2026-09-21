@@ -18,7 +18,9 @@ ARG RUSTUP_VERSION=1.28.2
 ARG RUSTUP_X86_64_SHA256=20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c
 ARG RUSTUP_AARCH64_SHA256=e3853c5a252fca15252d07cb23a1bdd9377a8c6f3efa01531109281ae47f841c
 ARG TARGETARCH
-ENV PATH=/root/.cargo/bin:${PATH}
+ENV RUSTUP_HOME=/opt/rustup
+ENV CARGO_HOME=/opt/cargo
+ENV PATH=/opt/cargo/bin:${PATH}
 ENV RUSTUP_TOOLCHAIN=${RUST_VERSION}
 
 RUN case "${TARGETARCH}" in \
@@ -36,6 +38,7 @@ RUN case "${TARGETARCH}" in \
     rustup target add --toolchain "${RUST_VERSION}" \
       x86_64-pc-windows-gnu aarch64-pc-windows-gnullvm && \
     rustup default "${RUST_VERSION}" && \
+    chmod -R a+rX "${RUSTUP_HOME}" "${CARGO_HOME}" && \
     rm -f /tmp/rustup-init
 
 FROM packages AS shader_tools

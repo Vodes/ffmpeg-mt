@@ -73,6 +73,10 @@ def test_windows_rust_toolchain_is_pinned_with_precompiled_targets() -> None:
     assert "--component rust-docs" in dockerfile
     assert "x86_64-pc-windows-gnu aarch64-pc-windows-gnullvm" in dockerfile
     assert "rust-src" not in dockerfile
+    assert "ENV RUSTUP_HOME=/opt/rustup" in dockerfile
+    assert "ENV CARGO_HOME=/opt/cargo" in dockerfile
+    assert "ENV PATH=/opt/cargo/bin:${PATH}" in dockerfile
+    assert "ENV PATH=/root/.cargo/bin:${PATH}" not in dockerfile
 
 
 def test_macos_uses_the_same_pinned_rustup_toolchain() -> None:
