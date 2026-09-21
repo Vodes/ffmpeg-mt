@@ -119,14 +119,16 @@ def test_rust_toolchain_notices_include_std_and_registry_licenses(
     assert (destination / "rust-std" / "rust-toolchain-licenses" / "MIT.txt").read_text() == "mit\n"
 
 
-def test_windows_runtime_dependencies_ignore_export_name(
+def test_windows_runtime_dependencies_allow_system_api_set_imports(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ctx = context(tmp_path, "windows-arm64")
     output = """
     DLL Name: AVRT.dll
+    DLL Name: bcryptprimitives.dll
     DLL Name: DWrite.dll
     DLL Name: IPHLPAPI.DLL
+    DLL Name: api-ms-win-core-synch-l1-2-0.dll
     DLL Name: api-ms-win-crt-conio-l1-1-0.dll
     DLL Name: api-ms-win-crt-multibyte-l1-1-0.dll
     DLL Name: api-ms-win-crt-utility-l1-1-0.dll
