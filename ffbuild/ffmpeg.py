@@ -75,8 +75,9 @@ def configure_flags(ctx: BuildContext, revision: int) -> list[str]:
             "--enable-vaapi",
             "--enable-libdrm",
         ]
+        flags += ["--enable-amf"]
         if ctx.target.name != "linux-arm64":
-            flags += ["--enable-amf", "--enable-libvpl"]
+            flags += ["--enable-libvpl"]
         flags += ["--enable-ffnvcodec", "--enable-nvdec", "--enable-nvenc"]
     elif ctx.target.windows:
         assert ctx.target.host is not None
@@ -102,15 +103,15 @@ def configure_flags(ctx: BuildContext, revision: int) -> list[str]:
             "--enable-d3d12va",
             "--enable-dxva2",
         ]
+        flags += [
+            "--enable-amf",
+            "--enable-ffnvcodec",
+            "--enable-nvdec",
+            "--enable-nvenc",
+            "--enable-libssh",
+        ]
         if ctx.target.arch == "x86_64":
-            flags += [
-                "--enable-libssh",
-                "--enable-amf",
-                "--enable-libvpl",
-                "--enable-ffnvcodec",
-                "--enable-nvdec",
-                "--enable-nvenc",
-            ]
+            flags += ["--enable-libvpl"]
     else:
         frameworks = (
             "-lMoltenVK -lc++ -framework Metal -framework Foundation -framework QuartzCore "

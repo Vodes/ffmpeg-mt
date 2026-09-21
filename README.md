@@ -9,9 +9,9 @@ Silicon. FFmpeg and every linked third-party input are checksum-pinned in
 | Target | Build environment | Platform acceleration |
 | --- | --- | --- |
 | `linux-x86_64` | manylinux_2_34, native GCC | VAAPI/DRM, Vulkan, OpenCL, NVIDIA, AMF, oneVPL/QSV |
-| `linux-arm64` | manylinux_2_34, native GCC | VAAPI/DRM, Vulkan, OpenCL, NVIDIA headers |
+| `linux-arm64` | manylinux_2_34, native GCC | VAAPI/DRM, Vulkan, OpenCL, NVIDIA headers, AMF |
 | `windows-x86_64` | manylinux_2_34, LLVM-MinGW/UCRT | MediaFoundation, D3D11/12, DXVA2, Vulkan, OpenCL, NVIDIA, AMF, oneVPL/QSV |
-| `windows-arm64` | manylinux_2_34, LLVM-MinGW/UCRT | MediaFoundation, D3D11/12, DXVA2, Vulkan, OpenCL |
+| `windows-arm64` | manylinux_2_34, LLVM-MinGW/UCRT | MediaFoundation, D3D11/12, DXVA2, Vulkan, OpenCL, NVIDIA, AMF |
 | `macos-arm64` | native macOS 15, macOS 12 target | VideoToolbox, AudioToolbox, AVFoundation, CoreImage/Metal, OpenCL, static MoltenVK |
 
 The curated codec/filter surface includes AV1, H.264/H.265, VP8/VP9, Opus,

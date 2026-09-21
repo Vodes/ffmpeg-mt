@@ -84,7 +84,7 @@ def build_openssl(ctx: BuildContext) -> None:
         "linux-x86_64": "linux-x86_64",
         "linux-arm64": "linux-aarch64",
         "windows-x86_64": "mingw64",
-        "windows-arm64": "mingw64",
+        "windows-arm64": "mingwarm64",
         "macos-arm64": "darwin64-arm64-cc",
     }[ctx.target.name]
     run(
@@ -955,14 +955,13 @@ def build_sdl2(ctx: BuildContext) -> None:
 
 
 def build_srt(ctx: BuildContext) -> None:
-    encryption = "OFF" if ctx.target.name == "windows-arm64" else "ON"
     cmake(
         ctx,
         extract(ctx, "srt"),
         "-DENABLE_SHARED=OFF",
         "-DENABLE_STATIC=ON",
         "-DENABLE_APPS=OFF",
-        f"-DENABLE_ENCRYPTION={encryption}",
+        "-DENABLE_ENCRYPTION=ON",
     )
     _ensure_static_cpp_runtime(ctx, ctx.prefix / "lib" / "pkgconfig" / "srt.pc")
 
@@ -1189,7 +1188,7 @@ def install_moltenvk(ctx: BuildContext) -> None:
 RECIPES: tuple[Recipe, ...] = (
     ("LLVM-MinGW notices", windows, record_llvm_mingw),
     ("zlib", always, build_zlib),
-    ("openssl", lambda ctx: ctx.target.name != "windows-arm64", build_openssl),
+    ("openssl", always, build_openssl),
     ("expat", always, build_expat),
     ("iconv", always, build_iconv),
     ("xz", always, build_xz),
@@ -1249,13 +1248,17 @@ RECIPES: tuple[Recipe, ...] = (
     ("sdl2", always, build_sdl2),
     ("srt", always, build_srt),
     ("rist", always, build_rist),
-    ("ssh", lambda ctx: ctx.target.name != "windows-arm64", build_ssh),
+    ("ssh", always, build_ssh),
     (
         "nv-codec-headers",
-        lambda ctx: not_macos(ctx) and ctx.target.name != "windows-arm64",
+        not_macos,
         build_nvcodec,
     ),
-    ("amf-headers", lambda ctx: not_macos(ctx) and x86(ctx), build_amf),
+    (
+        "amf-headers",
+        not_macos,
+        build_amf,
+    ),
     ("oneVPL", lambda ctx: not_macos(ctx) and x86(ctx), build_vpl),
     ("shaderc", always, build_shaderc),
     ("SPIRV-Cross", windows, build_spirv_cross),

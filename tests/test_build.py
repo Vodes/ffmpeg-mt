@@ -229,8 +229,10 @@ def test_dependency_order_and_predicates(tmp_path: Path, target: str) -> None:
         assert names.index("Implib.so") < names.index("libdrm") < names.index("libva")
     assert ("MoltenVK" in names) is (target == "macos-arm64")
     assert "fdk-aac" not in names
-    assert ("openssl" in names) is (target != "windows-arm64")
-    assert ("ssh" in names) is (target != "windows-arm64")
+    assert "openssl" in names
+    assert "ssh" in names
+    assert ("nv-codec-headers" in names) is (target != "macos-arm64")
+    assert ("amf-headers" in names) is (target != "macos-arm64")
 
 
 @pytest.mark.parametrize("target", TARGETS)
@@ -560,6 +562,22 @@ def test_windows_libssh_declares_strndup_after_configure(
     assert "char *strndup(const char *, size_t);" in captured["config"]  # type: ignore[operator]
 
 
+def test_windows_arm64_openssl_uses_arm_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = context(tmp_path, "windows-arm64")
+    source = tmp_path / "openssl"
+    source.mkdir()
+    commands: list[tuple[object, ...]] = []
+    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
+    monkeypatch.setattr(recipes, "run", lambda *args, **_kwargs: commands.append(args))
+    monkeypatch.setattr(recipes, "_set_pkg_config_variables", lambda *_args, **_kwargs: None)
+
+    recipes.build_openssl(ctx)
+
+    assert commands[0][1] == "mingwarm64"
+
+
 def test_static_opencl_pkg_config_has_platform_dependencies(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -610,7 +628,7 @@ def test_windows_openal_pkg_config_has_com_dependencies(
 
 @pytest.mark.parametrize(
     ("target", "encryption"),
-    (("linux-x86_64", "ON"), ("windows-x86_64", "ON"), ("windows-arm64", "OFF")),
+    (("linux-x86_64", "ON"), ("windows-x86_64", "ON"), ("windows-arm64", "ON")),
 )
 def test_srt_encryption_tracks_openssl_availability(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, target: str, encryption: str
