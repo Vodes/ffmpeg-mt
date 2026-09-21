@@ -239,7 +239,6 @@ jobs:
           pattern: ffmpeg-*
           path: dist
           merge-multiple: true
-      - run: uv run python -m scripts.source_archive
       - name: Create versioned release
         env:
           GH_TOKEN: ${{ github.token }}
