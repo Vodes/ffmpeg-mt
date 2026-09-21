@@ -483,19 +483,23 @@ def build_opencl_headers(ctx: BuildContext) -> None:
 
 
 def build_opencl_loader(ctx: BuildContext) -> None:
+    source = extract(ctx, "opencl_loader")
     cmake(
         ctx,
-        extract(ctx, "opencl_loader"),
+        source,
         "-DBUILD_TESTING=OFF",
         "-DENABLE_OPENCL_LAYERS=OFF",
+        "-DOPENCL_ICD_LOADER_DISABLE_OPENCLON12=ON",
+        "-DOPENCL_ICD_LOADER_PIC=ON",
         "-DOPENCL_ICD_LOADER_BUILD_TESTING=OFF",
         "-DOPENCL_ICD_LOADER_BUILD_SHARED_LIBS=OFF",
         f"-DOPENCL_ICD_LOADER_HEADERS_DIR={ctx.prefix / 'include'}",
     )
-    private = ["-lcfgmgr32", "-lruntimeobject"] if ctx.target.windows else ["-ldl", "-pthread"]
-    _append_pkg_config_tokens(
-        ctx.prefix / "lib" / "pkgconfig" / "OpenCL.pc", "Libs.private", private
-    )
+    pkg_config = ctx.prefix / "lib" / "pkgconfig" / "OpenCL.pc"
+    if ctx.target.windows:
+        _replace_pkg_config_token_suffix(pkg_config, "-lOpenCL", "-l:OpenCL.a")
+    private = ["-lole32", "-lshlwapi", "-lcfgmgr32"] if ctx.target.windows else ["-ldl", "-pthread"]
+    _append_pkg_config_tokens(pkg_config, "Libs.private", private)
 
 
 def build_libdrm(ctx: BuildContext) -> None:
@@ -964,12 +968,23 @@ def build_srt(ctx: BuildContext) -> None:
 
 
 def build_rist(ctx: BuildContext) -> None:
+    source = extract(ctx, "rist")
+    if ctx.target.name == "windows-arm64":
+        timing_source = source / "contrib" / "mbedtls" / "library" / "timing.c"
+        timing_text = timing_source.read_text(encoding="utf-8")
+        process_include = "#include <process.h>\n"
+        if timing_text.count(process_include) != 1:
+            raise RuntimeError("librist's bundled mbedTLS has an unexpected include layout")
+        timing_source.write_text(
+            timing_text.replace(process_include, process_include + "#include <sys/time.h>\n", 1),
+            encoding="utf-8",
+        )
     args = ["-Dtest=false", "-Dbuilt_tools=false", "-Dbuiltin_cjson=true"]
     if ctx.target.windows:
         args.append("-Dhave_mingw_pthreads=true")
     meson(
         ctx,
-        extract(ctx, "rist"),
+        source,
         *args,
     )
 

@@ -23,6 +23,7 @@ LINUX_ALLOWED = {
 }
 WINDOWS_ALLOWED = {
     "ADVAPI32.dll",
+    "AVRT.dll",
     "AVICAP32.dll",
     "BCRYPT.dll",
     "CFGMGR32.dll",
@@ -30,9 +31,12 @@ WINDOWS_ALLOWED = {
     "CRYPT32.dll",
     "D3D11.dll",
     "D3D12.dll",
+    "DWrite.dll",
     "DXGI.dll",
+    "d2d1.dll",
     "GDI32.dll",
     "IMM32.dll",
+    "IPHLPAPI.DLL",
     "KERNEL32.dll",
     "MF.dll",
     "MFPlat.dll",
@@ -52,16 +56,19 @@ WINDOWS_ALLOWED = {
     "WINMM.dll",
     "WS2_32.dll",
     "api-ms-win-crt-convert-l1-1-0.dll",
+    "api-ms-win-crt-conio-l1-1-0.dll",
     "api-ms-win-crt-environment-l1-1-0.dll",
     "api-ms-win-crt-filesystem-l1-1-0.dll",
     "api-ms-win-crt-heap-l1-1-0.dll",
     "api-ms-win-crt-locale-l1-1-0.dll",
     "api-ms-win-crt-math-l1-1-0.dll",
+    "api-ms-win-crt-multibyte-l1-1-0.dll",
     "api-ms-win-crt-private-l1-1-0.dll",
     "api-ms-win-crt-runtime-l1-1-0.dll",
     "api-ms-win-crt-stdio-l1-1-0.dll",
     "api-ms-win-crt-string-l1-1-0.dll",
     "api-ms-win-crt-time-l1-1-0.dll",
+    "api-ms-win-crt-utility-l1-1-0.dll",
 }
 
 COMPILED_FEATURE_NAMES = {
@@ -117,7 +124,7 @@ def _assert_runtime_dependencies(ctx: BuildContext, binary: Path) -> None:
                 raise RuntimeError(f"binary requires GLIBC_{major}.{minor}; maximum is GLIBC_2.34")
     elif ctx.target.windows:
         output = run(f"{ctx.target.host}-objdump", "-p", binary, capture=True)
-        needed = set(re.findall(r"DLL Name: ([^\r\n]+)", output, re.IGNORECASE))
+        needed = set(re.findall(r"DLL Name: ([^\r\n]+)", output))
         allowed = {item.lower() for item in WINDOWS_ALLOWED}
         unexpected = {item for item in needed if item.lower() not in allowed}
         if unexpected:

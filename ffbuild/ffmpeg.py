@@ -86,6 +86,7 @@ def configure_flags(ctx: BuildContext, revision: int) -> list[str]:
             "--target-os=mingw32",
             f"--arch={ctx.target.arch}",
             f"--cross-prefix={ctx.target.host}-",
+            "--pkg-config=pkg-config",
             f"--cc={env['CC']}",
             f"--cxx={env['CXX']}",
             f"--ar={env['AR']}",

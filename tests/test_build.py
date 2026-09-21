@@ -9,6 +9,7 @@ import pytest
 
 import ffbuild.helpers as helpers
 import ffbuild.recipes as recipes
+import ffbuild.validate as validation
 from ffbuild.ffmpeg import configure_flags
 from ffbuild.helpers import download, download_url, extract, fetch_text
 from ffbuild.model import BuildContext, Source, load_sources
@@ -23,6 +24,7 @@ from ffbuild.targets import TARGETS
 from ffbuild.validate import (
     _assert_lazy_vaapi,
     _assert_no_staged_shared_libraries,
+    _assert_runtime_dependencies,
     _scan_paths,
     _vulkan_smoke,
     assert_configure_flags,
@@ -59,6 +61,24 @@ def test_archive_members_are_unique(tmp_path: Path) -> None:
         "artifact/licenses/dependency",
         "artifact/licenses/dependency/LICENSE",
     ]
+
+
+def test_windows_runtime_dependencies_ignore_export_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = context(tmp_path, "windows-arm64")
+    output = """
+    DLL Name: AVRT.dll
+    DLL Name: DWrite.dll
+    DLL Name: IPHLPAPI.DLL
+    DLL Name: api-ms-win-crt-conio-l1-1-0.dll
+    DLL Name: api-ms-win-crt-multibyte-l1-1-0.dll
+    DLL Name: api-ms-win-crt-utility-l1-1-0.dll
+ DLL name: ffmpeg_g.exe
+"""
+    monkeypatch.setattr(validation, "run", lambda *_args, **_kwargs: output)
+
+    _assert_runtime_dependencies(ctx, tmp_path / "ffmpeg.exe")
 
 
 def test_third_party_workflow_actions_are_commit_pinned() -> None:
@@ -221,6 +241,8 @@ def test_configure_manifest_and_nonfree_separation(tmp_path: Path, target: str) 
     assert len(public_flags) == len(set(public_flags))
     assert "--enable-nonfree" not in public_flags
     assert "--enable-libfdk-aac" not in public_flags
+    if target.startswith("windows-"):
+        assert "--pkg-config=pkg-config" in public_flags
     if target == "macos-arm64":
         extra_libraries = next(flag for flag in public_flags if flag.startswith("--extra-libs="))
         assert "-lc++" in extra_libraries
@@ -543,7 +565,7 @@ def test_static_opencl_pkg_config_has_platform_dependencies(
 ) -> None:
     for target, expected in (
         ("linux-x86_64", {"-ldl", "-pthread"}),
-        ("windows-x86_64", {"-lcfgmgr32", "-lruntimeobject"}),
+        ("windows-x86_64", {"-lole32", "-lshlwapi", "-lcfgmgr32"}),
     ):
         ctx = context(tmp_path / target, target)
         source = tmp_path / target / "opencl"
@@ -559,6 +581,9 @@ def test_static_opencl_pkg_config_has_platform_dependencies(
         recipes.build_opencl_loader(ctx)
         metadata = (ctx.prefix / "lib" / "pkgconfig" / "OpenCL.pc").read_text(encoding="utf-8")
         assert expected <= set(metadata.split())
+        if ctx.target.windows:
+            assert "-l:OpenCL.a" in metadata
+            assert "-lOpenCL" not in metadata
 
 
 def test_windows_openal_pkg_config_has_com_dependencies(
@@ -606,6 +631,26 @@ def test_srt_encryption_tracks_openssl_availability(
     recipes.build_srt(ctx)
 
     assert f"-DENABLE_ENCRYPTION={encryption}" in calls[0]
+
+
+def test_windows_arm64_rist_declares_gettimeofday(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = context(tmp_path, "windows-arm64")
+    source = tmp_path / "rist"
+    timing_source = source / "contrib" / "mbedtls" / "library" / "timing.c"
+    timing_source.parent.mkdir(parents=True)
+    timing_source.write_text("#include <windows.h>\n#include <process.h>\n", encoding="utf-8")
+    meson_calls: list[tuple[object, ...]] = []
+    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
+    monkeypatch.setattr(recipes, "meson", lambda *args: meson_calls.append(args))
+
+    recipes.build_rist(ctx)
+
+    assert "#include <process.h>\n#include <sys/time.h>\n" in timing_source.read_text(
+        encoding="utf-8"
+    )
+    assert meson_calls[0][1] == source
 
 
 def test_aribcaption_uses_a_linker_flag_for_the_static_cpp_runtime(

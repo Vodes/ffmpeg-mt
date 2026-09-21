@@ -64,6 +64,10 @@ RUN case "${TARGETARCH}" in \
 
 RUN ln -s windows.h /opt/llvm-mingw/generic-w64-mingw32/include/Windows.h
 
+# Match the reference Windows images: remove shared runtime and import libraries
+# so LLVM-MinGW consistently selects its static runtimes.
+RUN find /opt/llvm-mingw \( -name '*.dll' -o -name '*.dll.a' \) -delete
+
 COPY --from=llvm_mingw_runtime \
     /usr/lib/*-linux-gnu/libstdc++.so.6* /opt/llvm-mingw/host-libs/
 
