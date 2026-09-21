@@ -18,7 +18,7 @@ MANYLINUX_IMAGES = {
 }
 
 
-def run_in_container(root: Path, target: str, jobs: int, with_fdk_aac: bool, clean: bool) -> None:
+def run_in_container(root: Path, target: str, jobs: int, nonfree: bool, clean: bool) -> None:
     machine = platform.machine().lower()
     expected = {"x86_64", "amd64"} if target.endswith("x86_64") else {"arm64", "aarch64"}
     if machine not in expected:
@@ -46,8 +46,8 @@ def run_in_container(root: Path, target: str, jobs: int, with_fdk_aac: bool, cle
             check=True,
         )
     command = ["uv", "run", "python", "build.py", target, "--jobs", str(jobs)]
-    if with_fdk_aac:
-        command.append("--with-fdk-aac")
+    if nonfree:
+        command.append("--nonfree")
     if clean:
         command.append("--clean")
     subprocess.run(

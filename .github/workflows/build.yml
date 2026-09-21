@@ -6,8 +6,8 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      with_fdk_aac:
-        description: Build the local/private nonfree profile
+      nonfree:
+        description: Enable the nonfree build profile
         type: boolean
         default: false
       release:
@@ -93,27 +93,19 @@ jobs:
           FFMPEG_MT_SKIP_IMAGE_BUILD: "1"
         run: >-
           uv run python build.py ${{ matrix.target }} --clean
-          ${{ inputs.with_fdk_aac && '--with-fdk-aac' || '' }}
+          ${{ inputs.nonfree && '--nonfree' || '' }}
       - name: Build on macOS
         if: ${{ !matrix.container }}
         run: >-
           uv run python build.py ${{ matrix.target }} --clean
-          ${{ inputs.with_fdk_aac && '--with-fdk-aac' || '' }}
-      - name: Upload redistributable artifact
-        if: ${{ !inputs.with_fdk_aac }}
+          ${{ inputs.nonfree && '--nonfree' || '' }}
+      - name: Upload build artifact
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: ffmpeg-${{ matrix.target }}
-          path: dist/*
-      - name: Upload private nonfree artifact
-        if: ${{ inputs.with_fdk_aac && github.event.repository.private }}
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: ffmpeg-${{ matrix.target }}-nonfree
+          name: ffmpeg-${{ matrix.target }}${{ inputs.nonfree && '-nonfree' || '' }}
           path: dist/*
 
   windows-smoke:
-    if: ${{ !inputs.with_fdk_aac || github.event.repository.private }}
     needs: build
     strategy:
       fail-fast: false
@@ -128,7 +120,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8.0.1
         with:
-          name: ffmpeg-${{ matrix.target }}${{ inputs.with_fdk_aac && '-nonfree' || '' }}
+          name: ffmpeg-${{ matrix.target }}${{ inputs.nonfree && '-nonfree' || '' }}
           path: artifact
       - name: Extract artifact
         shell: pwsh
@@ -211,7 +203,7 @@ jobs:
           }
 
   release:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release && !inputs.with_fdk_aac }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
     needs: [build, windows-smoke]
     runs-on: ubuntu-24.04
     permissions:
@@ -235,7 +227,8 @@ jobs:
         run: |
           VERSION=$(uv run python -c 'import tomllib; print(tomllib.load(open("sources.lock.toml", "rb"))["sources"]["ffmpeg"]["version"])')
           REVISION=$(uv run python -c 'import tomllib; print(tomllib.load(open("sources.lock.toml", "rb"))["build"]["revision"])')
-          TAG="v${VERSION}-r${REVISION}"
+          PROFILE_SUFFIX="${{ inputs.nonfree && '-nonfree' || '' }}"
+          TAG="v${VERSION}-r${REVISION}${PROFILE_SUFFIX}"
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists; nothing to publish."
             exit 0

@@ -16,8 +16,6 @@ from ffbuild.model import BuildContext, Source, load_sources
 from ffbuild.package import (
     _write_tar,
     artifact_name,
-    private_upload_allowed,
-    public_release_allowed,
 )
 from ffbuild.recipes import selected_recipes
 from ffbuild.targets import TARGETS
@@ -173,10 +171,10 @@ def test_target_shaderc_installs_static_metadata_and_spirv_headers(
 
 
 @pytest.mark.parametrize(
-    ("target", "machine", "stage", "base_arch"),
+    ("target", "machine", "stage", "base_arch", "nonfree"),
     (
-        ("linux-x86_64", "x86_64", "linux_builder", "x86_64"),
-        ("windows-arm64", "aarch64", "builder", "aarch64"),
+        ("linux-x86_64", "x86_64", "linux_builder", "x86_64", False),
+        ("windows-arm64", "aarch64", "builder", "aarch64", True),
     ),
 )
 def test_container_selects_only_the_required_image_stage(
@@ -186,6 +184,7 @@ def test_container_selects_only_the_required_image_stage(
     machine: str,
     stage: str,
     base_arch: str,
+    nonfree: bool,
 ) -> None:
     commands: list[list[str]] = []
     monkeypatch.setattr("scripts.build_container.platform.machine", lambda: machine)
@@ -194,11 +193,12 @@ def test_container_selects_only_the_required_image_stage(
         lambda command, check: commands.append(command),
     )
 
-    run_in_container(tmp_path, target, 2, False, False)
+    run_in_container(tmp_path, target, 2, nonfree, False)
 
     assert commands[0][commands[0].index("--target") + 1] == stage
     base_image = commands[0][commands[0].index("--build-arg") + 1]
     assert f"manylinux_2_34_{base_arch}@sha256:" in base_image
+    assert ("--nonfree" in commands[1]) is nonfree
 
 
 @pytest.mark.parametrize("target", TARGETS)
@@ -237,16 +237,16 @@ def test_dependency_order_and_predicates(tmp_path: Path, target: str) -> None:
 
 @pytest.mark.parametrize("target", TARGETS)
 def test_configure_manifest_and_nonfree_separation(tmp_path: Path, target: str) -> None:
-    public = context(tmp_path, target)
-    public_flags = configure_flags(public, 1)
-    assert_configure_flags(ROOT, target, public_flags, False)
-    assert len(public_flags) == len(set(public_flags))
-    assert "--enable-nonfree" not in public_flags
-    assert "--enable-libfdk-aac" not in public_flags
+    default = context(tmp_path, target)
+    default_flags = configure_flags(default, 1)
+    assert_configure_flags(ROOT, target, default_flags, False)
+    assert len(default_flags) == len(set(default_flags))
+    assert "--enable-nonfree" not in default_flags
+    assert "--enable-libfdk-aac" not in default_flags
     if target.startswith("windows-"):
-        assert "--pkg-config=pkg-config" in public_flags
+        assert "--pkg-config=pkg-config" in default_flags
     if target == "macos-arm64":
-        extra_libraries = next(flag for flag in public_flags if flag.startswith("--extra-libs="))
+        extra_libraries = next(flag for flag in default_flags if flag.startswith("--extra-libs="))
         assert "-lc++" in extra_libraries
         assert "-framework AppKit" in extra_libraries
         assert "-framework CoreGraphics" in extra_libraries
@@ -262,16 +262,6 @@ def test_artifact_names(tmp_path: Path) -> None:
     assert artifact_name(context(tmp_path, "macos-arm64", True)) == (
         "ffmpeg-9.0.2-macos-arm64-nonfree.tar.zst"
     )
-
-
-def test_release_gate() -> None:
-    assert public_release_allowed(False, False)
-    assert public_release_allowed(False, True)
-    assert not public_release_allowed(True, False)
-    assert not public_release_allowed(True, True)
-    assert private_upload_allowed(False, False)
-    assert not private_upload_allowed(True, False)
-    assert private_upload_allowed(True, True)
 
 
 def test_download_rejects_bad_checksum(tmp_path: Path) -> None:

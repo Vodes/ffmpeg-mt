@@ -1,8 +1,9 @@
 # ffmpeg-mt
 
-Reproducible GPLv3 FFmpeg and FFprobe builds for Linux, Windows, and Apple
-Silicon. FFmpeg and every linked third-party input are checksum-pinned in
-`sources.lock.toml`; the build prefix is isolated from host package metadata.
+Reproducible FFmpeg and FFprobe builds for Linux, Windows, and Apple Silicon.
+The default profile is GPLv3. FFmpeg and every linked third-party input are
+checksum-pinned in `sources.lock.toml`; the build prefix is isolated from host
+package metadata.
 
 ## Targets
 
@@ -26,7 +27,7 @@ The single build interface launches the manylinux_2_34 builder automatically for
 Linux and Windows, and builds directly on macOS:
 
 ```console
-uv run python build.py <target> [--with-fdk-aac] [--jobs N] [--clean]
+uv run python build.py <target> [--nonfree] [--jobs N] [--clean]
 ```
 
 Outputs are written to `dist/` as
@@ -49,11 +50,13 @@ actually used.
 
 ## Nonfree profile
 
-`--with-fdk-aac` is the sole nonfree switch. It adds libfdk-aac, passes both
-`--enable-libfdk-aac` and `--enable-nonfree`, marks metadata as
-non-redistributable, and adds `-nonfree` to the filename. CI never attaches
-such an archive to a public release; manual artifact upload is allowed only
-for a private repository.
+`--nonfree` selects the generic nonfree profile. It currently adds libfdk-aac,
+passes both `--enable-libfdk-aac` and `--enable-nonfree`, marks metadata as
+non-redistributable, and adds `-nonfree` to the filename and release tag.
+Additional nonfree dependencies can be added to this profile without changing
+the build interface. The workflow input controls whether this profile is built
+and published; the repository owner is responsible for deciding where to
+publish the resulting archive.
 
 ## Updating
 
@@ -65,8 +68,7 @@ revision, and opens a PR. Dependency pins are reviewed and updated manually.
 Pushes, pull requests, and manual workflow runs build, test, and retain the
 target archives as GitHub Actions artifacts. Publishing a versioned GitHub
 release requires a manual workflow run with the `release` checkbox selected;
-the checkbox defaults to off and nonfree builds can never select the release
-path.
+the checkbox defaults to off.
 
 ## Disclaimer
 

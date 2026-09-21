@@ -14,11 +14,11 @@ def build(
     root: Path,
     target_name: str,
     jobs: int,
-    with_fdk_aac: bool,
+    nonfree: bool,
     clean: bool,
 ) -> Path:
     sources, revision = load_sources(root / "sources.lock.toml")
-    ctx = BuildContext(root, TARGETS[target_name], sources, jobs, with_fdk_aac)
+    ctx = BuildContext(root, TARGETS[target_name], sources, jobs, nonfree)
     ctx.prepare(clean)
     build_dependencies(ctx)
     _, flags = build_ffmpeg(ctx, revision)

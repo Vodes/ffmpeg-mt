@@ -46,7 +46,7 @@ class BuildContext:
     target: Target
     sources: dict[str, Source]
     jobs: int
-    with_fdk_aac: bool
+    nonfree: bool
     source_dirs: dict[str, Path] = field(default_factory=dict)
 
     @property

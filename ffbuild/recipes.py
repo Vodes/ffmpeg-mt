@@ -32,8 +32,8 @@ def x86(ctx: BuildContext) -> bool:
     return ctx.target.arch == "x86_64"
 
 
-def fdk(ctx: BuildContext) -> bool:
-    return ctx.with_fdk_aac
+def nonfree(ctx: BuildContext) -> bool:
+    return ctx.nonfree
 
 
 def macos(ctx: BuildContext) -> bool:
@@ -1263,7 +1263,7 @@ RECIPES: tuple[Recipe, ...] = (
     ("shaderc", always, build_shaderc),
     ("SPIRV-Cross", windows, build_spirv_cross),
     ("libplacebo", always, build_placebo),
-    ("fdk-aac", fdk, build_fdk_aac),
+    ("fdk-aac", nonfree, build_fdk_aac),
 )
 
 

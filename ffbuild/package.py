@@ -12,16 +12,8 @@ from .model import BuildContext
 
 def artifact_name(ctx: BuildContext) -> str:
     version = ctx.sources["ffmpeg"].version
-    suffix = "-nonfree" if ctx.with_fdk_aac else ""
+    suffix = "-nonfree" if ctx.nonfree else ""
     return f"ffmpeg-{version}-{ctx.target.name}{suffix}.tar.zst"
-
-
-def public_release_allowed(with_fdk_aac: bool, repository_private: bool) -> bool:
-    return not with_fdk_aac
-
-
-def private_upload_allowed(with_fdk_aac: bool, repository_private: bool) -> bool:
-    return not with_fdk_aac or repository_private
 
 
 def _normalise(info: tarfile.TarInfo) -> tarfile.TarInfo:
@@ -105,8 +97,8 @@ def package(ctx: BuildContext, revision: int, flags: list[str]) -> Path:
             "build_revision": revision,
             "ffmpeg_version": ctx.sources["ffmpeg"].version,
             "target": ctx.target.name,
-            "profile": "nonfree" if ctx.with_fdk_aac else "gplv3",
-            "redistributable": not ctx.with_fdk_aac,
+            "profile": "nonfree" if ctx.nonfree else "gplv3",
+            "redistributable": not ctx.nonfree,
             "configure": flags,
             "sources": source_records,
         }

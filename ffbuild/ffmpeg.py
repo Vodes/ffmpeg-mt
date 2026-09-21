@@ -133,7 +133,7 @@ def configure_flags(ctx: BuildContext, revision: int) -> list[str]:
             "--enable-libplacebo",
             f"--extra-libs={frameworks}",
         ]
-    if ctx.with_fdk_aac:
+    if ctx.nonfree:
         flags += ["--enable-libfdk-aac", "--enable-nonfree"]
     return flags
 

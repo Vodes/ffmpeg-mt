@@ -88,16 +88,16 @@ def _expected(root: Path, target: str) -> tuple[dict[str, Any], dict[str, Any]]:
     return data["common"], data["targets"][target]
 
 
-def assert_configure_flags(root: Path, target: str, flags: list[str], with_fdk_aac: bool) -> None:
+def assert_configure_flags(root: Path, target: str, flags: list[str], nonfree: bool) -> None:
     common, selected = _expected(root, target)
     missing = (set(common["configure"]) | set(selected["configure"])) - set(flags)
     if missing:
         raise RuntimeError(f"missing required configure flags: {sorted(missing)}")
-    if with_fdk_aac:
+    if nonfree:
         if not {"--enable-libfdk-aac", "--enable-nonfree"} <= set(flags):
-            raise RuntimeError("FDK-AAC builds must enable both libfdk-aac and nonfree")
+            raise RuntimeError("nonfree builds must enable both libfdk-aac and nonfree")
     elif {"--enable-libfdk-aac", "--enable-nonfree"} & set(flags):
-        raise RuntimeError("public build contains nonfree configuration")
+        raise RuntimeError("default build contains nonfree configuration")
 
 
 def _assert_architecture(ctx: BuildContext, binary: Path) -> None:
@@ -317,7 +317,7 @@ def validate(ctx: BuildContext, flags: list[str]) -> None:
     suffix = ctx.target.executable_suffix
     ffmpeg = ctx.prefix / "bin" / f"ffmpeg{suffix}"
     ffprobe = ctx.prefix / "bin" / f"ffprobe{suffix}"
-    assert_configure_flags(ctx.root, ctx.target.name, flags, ctx.with_fdk_aac)
+    assert_configure_flags(ctx.root, ctx.target.name, flags, ctx.nonfree)
     _assert_compiled_features(ctx)
     _assert_no_staged_shared_libraries(ctx)
     for binary in (ffmpeg, ffprobe):
