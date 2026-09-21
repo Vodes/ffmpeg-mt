@@ -16,22 +16,22 @@ def artifact_name(ctx: BuildContext) -> str:
     return f"ffmpeg-{version}-{ctx.target.name}{suffix}.tar.zst"
 
 
-def _normalise(info: tarfile.TarInfo) -> tarfile.TarInfo:
+def _normalise(info: tarfile.TarInfo, mtime: int) -> tarfile.TarInfo:
     info.uid = 0
     info.gid = 0
     info.uname = ""
     info.gname = ""
-    info.mtime = 0
+    info.mtime = mtime
     return info
 
 
-def _write_tar(source: Path, destination: Path) -> None:
+def _write_tar(source: Path, destination: Path, mtime: int) -> None:
     with tarfile.open(destination, "w") as archive:
         for path in sorted(source.rglob("*"), key=lambda item: item.as_posix()):
             archive.add(
                 path,
                 arcname=path.relative_to(source.parent),
-                filter=_normalise,
+                filter=lambda info: _normalise(info, mtime),
                 recursive=False,
             )
 
@@ -109,7 +109,7 @@ def package(ctx: BuildContext, revision: int, flags: list[str]) -> Path:
             raise RuntimeError(f"build metadata leaks private build paths: {leaked}")
         (staging / "build-info.json").write_text(encoded_metadata, encoding="utf-8")
         raw_tar = ctx.build_root / f"{root_name}.tar"
-        _write_tar(staging, raw_tar)
+        _write_tar(staging, raw_tar, ctx.build_epoch)
         output = ctx.dist / name
         output.unlink(missing_ok=True)
         run("zstd", "-T0", "-19", "--no-progress", "-o", output, raw_tar)

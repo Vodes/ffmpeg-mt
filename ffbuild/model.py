@@ -2,10 +2,17 @@ from __future__ import annotations
 
 import os
 import shutil
+import time
 import tomllib
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+
+def _build_epoch() -> int:
+    epoch = os.environ.get("SOURCE_DATE_EPOCH")
+    return int(epoch) if epoch is not None else int(time.time())
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +55,11 @@ class BuildContext:
     jobs: int
     nonfree: bool
     source_dirs: dict[str, Path] = field(default_factory=dict)
+    build_epoch: int = field(default_factory=_build_epoch)
+
+    @property
+    def build_date(self) -> str:
+        return datetime.fromtimestamp(self.build_epoch, UTC).strftime("%Y%m%d")
 
     @property
     def build_root(self) -> Path:
@@ -99,7 +111,7 @@ class BuildContext:
                 "PKG_CONFIG_PATH": "",
                 "CMAKE_PREFIX_PATH": prefix,
                 "PATH": os.pathsep.join([f"{prefix}/bin", env.get("PATH", "")]),
-                "SOURCE_DATE_EPOCH": env.get("SOURCE_DATE_EPOCH", "0"),
+                "SOURCE_DATE_EPOCH": str(self.build_epoch),
                 "ZERO_AR_DATE": "1",
                 "FFMPEG_MT_TARGET": self.target.name,
                 "FFMPEG_MT_PREFIX": prefix,

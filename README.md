@@ -33,6 +33,10 @@ uv run python build.py <target> [--nonfree] [--jobs N] [--clean]
 Outputs are written to `dist/` as
 `ffmpeg-<version>-<target>.tar.zst`. Each archive has only `ffmpeg`,
 `ffprobe`, third-party notices, and machine-readable build/source metadata.
+FFmpeg's reported extra version uses `ffmt.<UTC build date>.r<revision>`, for
+example `ffmt.20260921.r1`. Binary archive entries use the same build timestamp
+instead of the Unix epoch. Set `SOURCE_DATE_EPOCH` to override both values for a
+reproducible rebuild.
 The corresponding-source archive is produced with:
 
 ```console

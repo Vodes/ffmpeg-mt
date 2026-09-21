@@ -47,11 +47,13 @@ def test_archive_members_are_unique(tmp_path: Path) -> None:
     (nested / "LICENSE").write_text("license\n", encoding="utf-8")
 
     archive = tmp_path / "artifact.tar"
-    _write_tar(source, archive)
+    _write_tar(source, archive, 123456789)
 
     with tarfile.open(archive) as bundle:
-        names = bundle.getnames()
+        members = bundle.getmembers()
+        names = [member.name for member in members]
     assert len(names) == len(set(names))
+    assert {member.mtime for member in members} == {123456789}
     assert names == [
         "artifact/bin",
         "artifact/bin/ffmpeg",
@@ -188,6 +190,7 @@ def test_container_selects_only_the_required_image_stage(
 ) -> None:
     commands: list[list[str]] = []
     monkeypatch.setattr("scripts.build_container.platform.machine", lambda: machine)
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")
     monkeypatch.setattr(
         "scripts.build_container.subprocess.run",
         lambda command, check: commands.append(command),
@@ -199,6 +202,7 @@ def test_container_selects_only_the_required_image_stage(
     base_image = commands[0][commands[0].index("--build-arg") + 1]
     assert f"manylinux_2_34_{base_arch}@sha256:" in base_image
     assert ("--nonfree" in commands[1]) is nonfree
+    assert "SOURCE_DATE_EPOCH=0" in commands[1]
 
 
 @pytest.mark.parametrize("target", TARGETS)
@@ -255,6 +259,28 @@ def test_configure_manifest_and_nonfree_separation(tmp_path: Path, target: str) 
     nonfree_flags = configure_flags(nonfree, 1)
     assert_configure_flags(ROOT, target, nonfree_flags, True)
     assert {"--enable-nonfree", "--enable-libfdk-aac"} <= set(nonfree_flags)
+
+
+def test_extra_version_includes_source_date_and_revision(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")
+
+    flags = configure_flags(context(tmp_path, "linux-x86_64"), 7)
+
+    assert "--extra-version=ffmt.19700101.r7" in flags
+
+
+def test_build_timestamp_defaults_to_current_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("SOURCE_DATE_EPOCH", raising=False)
+    monkeypatch.setattr("ffbuild.model.time.time", lambda: 1234567890)
+
+    ctx = context(tmp_path, "linux-x86_64")
+
+    assert ctx.build_epoch == 1234567890
+    assert ctx.env()["SOURCE_DATE_EPOCH"] == "1234567890"
 
 
 def test_artifact_names(tmp_path: Path) -> None:

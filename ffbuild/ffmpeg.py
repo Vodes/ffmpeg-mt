@@ -61,7 +61,7 @@ def configure_flags(ctx: BuildContext, revision: int) -> list[str]:
     flags = [
         *COMMON_FLAGS,
         "--prefix=/",
-        f"--extra-version=ffmt.{revision}",
+        f"--extra-version=ffmt.{ctx.build_date}.r{revision}",
     ]
     if ctx.target.linux:
         flags += [

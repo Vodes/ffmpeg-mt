@@ -50,6 +50,17 @@ def run_in_container(root: Path, target: str, jobs: int, nonfree: bool, clean: b
         command.append("--nonfree")
     if clean:
         command.append("--clean")
+    container_environment = [
+        "--env",
+        "UV_CACHE_DIR=/tmp/uv-cache",
+        "--env",
+        "UV_PROJECT_ENVIRONMENT=/tmp/ffmpeg-mt-venv",
+        "--env",
+        "FFMPEG_MT_IN_CONTAINER=1",
+    ]
+    source_date_epoch = os.environ.get("SOURCE_DATE_EPOCH")
+    if source_date_epoch is not None:
+        container_environment += ["--env", f"SOURCE_DATE_EPOCH={source_date_epoch}"]
     subprocess.run(
         [
             "docker",
@@ -59,12 +70,7 @@ def run_in_container(root: Path, target: str, jobs: int, nonfree: bool, clean: b
             f"{__import__('os').getuid()}:{__import__('os').getgid()}",
             "--volume",
             f"{root}:/src",
-            "--env",
-            "UV_CACHE_DIR=/tmp/uv-cache",
-            "--env",
-            "UV_PROJECT_ENVIRONMENT=/tmp/ffmpeg-mt-venv",
-            "--env",
-            "FFMPEG_MT_IN_CONTAINER=1",
+            *container_environment,
             image,
             *command,
         ],
