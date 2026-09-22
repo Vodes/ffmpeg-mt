@@ -2,7 +2,7 @@
 # Update this file with scripts/update_ffmpeg.py; build logic belongs in ffbuild/.
 
 [build]
-revision = 1
+revision = 2
 
 [sources.ffmpeg]
 version = "9.0.2"
