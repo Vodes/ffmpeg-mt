@@ -47,6 +47,9 @@ The build validates target architecture, expected features, runtime-library
 allowlists, the Linux glibc 2.34 ceiling, macOS 12 deployment metadata, and
 leaked host/build paths. CI executes every packaged binary on a matching native
 runner and performs a generated A/V encode-and-probe smoke test.
+The macOS CI runner also tests Vulkan scaling, but skips libplacebo's Vulkan
+smoke test because its paravirtual Metal driver crashes during image binding.
+That test remains enabled on local macOS builds and Linux x86-64 CI.
 Linux VAAPI uses pinned Implib.so lazy import shims on both architectures: no
 libva or libva-drm shared object is packaged or added to `DT_NEEDED`, while a
 host with a compatible VAAPI runtime and driver can load them when VAAPI is

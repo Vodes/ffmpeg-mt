@@ -592,6 +592,32 @@ def test_vulkan_smoke_exercises_libplacebo_runtime_compilation(
     assert any("libplacebo=" in str(argument) for argument in commands[1])
 
 
+@pytest.mark.parametrize(
+    ("target", "skip", "expected_count"),
+    [("macos-arm64", "1", 1), ("macos-arm64", None, 2), ("linux-x86_64", "1", 2)],
+)
+def test_vulkan_smoke_can_skip_libplacebo_on_macos(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    target: str,
+    skip: str | None,
+    expected_count: int,
+) -> None:
+    commands: list[tuple[object, ...]] = []
+    if skip is None:
+        monkeypatch.delenv("FFMPEG_MT_SKIP_LIBPLACEBO_SMOKE", raising=False)
+    else:
+        monkeypatch.setenv("FFMPEG_MT_SKIP_LIBPLACEBO_SMOKE", skip)
+    monkeypatch.setattr("ffbuild.validate.run", lambda *args: commands.append(args))
+
+    _vulkan_smoke(context(tmp_path, target), tmp_path / "ffmpeg")
+
+    assert len(commands) == expected_count
+    assert any("scale_vulkan=" in str(argument) for argument in commands[0])
+    if expected_count == 2:
+        assert any("libplacebo=" in str(argument) for argument in commands[1])
+
+
 def test_glib_stages_declared_libintl_fallback_on_macos(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

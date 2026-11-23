@@ -112,30 +112,12 @@ jobs:
           uv run python build.py ${{ matrix.target }} --clean
           ${{ inputs.nonfree && '--nonfree' || '' }}
       - name: Build on macOS
-        id: macos-build
         if: ${{ !matrix.container }}
+        env:
+          FFMPEG_MT_SKIP_LIBPLACEBO_SMOKE: "1"
         run: >-
           uv run python build.py ${{ matrix.target }} --clean
           ${{ inputs.nonfree && '--nonfree' || '' }}
-      - name: Diagnose macOS Vulkan failure
-        if: ${{ failure() && steps.macos-build.outcome == 'failure' }}
-        timeout-minutes: 3
-        run: |
-          ffmpeg="$GITHUB_WORKSPACE/build/macos-arm64/prefix/bin/ffmpeg"
-          if [[ ! -x "$ffmpeg" ]]; then
-            echo "No FFmpeg binary is available for Vulkan diagnostics."
-            exit 0
-          fi
-          args=(
-            -hide_banner -loglevel verbose
-            -init_hw_device vulkan=vk:0 -filter_hw_device vk
-            -f lavfi -i 'testsrc2=duration=0.2:size=128x72:rate=5'
-            -vf 'format=nv12,hwupload,libplacebo=w=64:h=36,hwdownload,format=nv12'
-            -f null -
-          )
-          "$ffmpeg" "${args[@]}" || echo "Verbose Vulkan reproduction failed."
-          xcrun lldb --batch -o run -k 'thread backtrace all' -- \
-            "$ffmpeg" "${args[@]}" || echo "LLDB reproduction failed or stopped on a crash."
       - name: Upload build artifact
         uses: actions/upload-artifact@v7.0.2
         with:

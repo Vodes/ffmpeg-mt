@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import platform
 import re
 import tomllib
@@ -276,6 +277,11 @@ def _vulkan_smoke(ctx: BuildContext, ffmpeg: Path) -> None:
         "null",
         "-",
     )
+    if ctx.target.macos and os.environ.get("FFMPEG_MT_SKIP_LIBPLACEBO_SMOKE") == "1":
+        print(
+            "Skipping libplacebo Vulkan smoke test (FFMPEG_MT_SKIP_LIBPLACEBO_SMOKE=1)", flush=True
+        )
+        return
     run(
         ffmpeg,
         "-hide_banner",
