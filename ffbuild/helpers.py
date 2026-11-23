@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import tarfile
+import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -16,6 +17,8 @@ from .model import BuildContext, Source
 
 HTTP_SESSION = niquests.Session(
     timeout=(10, 60),
+    # Some builder networks fail when receiving QUIC datagrams.
+    disable_http3=True,
     retries=niquests.RetryConfiguration(
         total=5,
         backoff_factor=0.5,
@@ -61,12 +64,25 @@ def download_url(url: str, destination: Path) -> None:
     if parsed.scheme == "file":
         shutil.copyfile(Path(unquote(parsed.path)), destination)
         return
-    with HTTP_SESSION.get(url, stream=True, allow_redirects=True) as response:
-        response.raise_for_status()
-        with destination.open("wb") as output:
-            for block in response.iter_content(chunk_size=1024 * 1024):
-                if block:
-                    output.write(block)
+    for attempt in range(3):
+        with HTTP_SESSION.get(url, stream=True, allow_redirects=True) as response:
+            response.raise_for_status()
+            try:
+                with destination.open("wb") as output:
+                    for block in response.iter_content(chunk_size=1024 * 1024):
+                        if block:
+                            output.write(block)
+            except (
+                niquests.exceptions.ChunkedEncodingError,
+                niquests.exceptions.ConnectionError,
+                niquests.exceptions.Timeout,
+            ):
+                destination.unlink(missing_ok=True)
+                if attempt == 2:
+                    raise
+                time.sleep(0.5 * 2**attempt)
+            else:
+                return
 
 
 def fetch_text(url: str) -> str:

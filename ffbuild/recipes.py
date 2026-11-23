@@ -186,9 +186,17 @@ def build_dvdread(ctx: BuildContext) -> None:
 
 
 def build_dvdnav(ctx: BuildContext) -> None:
+    source = extract(ctx, "dvdnav")
+    if ctx.target.windows:
+        meson_build = source / "meson.build"
+        meson_text = meson_build.read_text(encoding="utf-8")
+        bitfield_flag = "        '-mno-ms-bitfields',\n"
+        if meson_text.count(bitfield_flag) != 1:
+            raise RuntimeError("libdvdnav's bitfield compiler flag was not found exactly once")
+        meson_build.write_text(meson_text.replace(bitfield_flag, ""), encoding="utf-8")
     meson(
         ctx,
-        extract(ctx, "dvdnav"),
+        source,
         "-Denable_docs=false",
         "-Denable_examples=false",
     )
@@ -209,15 +217,15 @@ def build_aribcaption(ctx: BuildContext) -> None:
 def build_openal(ctx: BuildContext) -> None:
     source = extract(ctx, "openal")
     if ctx.target.windows:
-        fmt_header = source / "fmt-11.1.1" / "include" / "fmt" / "format.h"
-        fmt_text = fmt_header.read_text(encoding="utf-8")
-        include_marker = "#  include <cstdint>  // uint32_t\n"
-        if fmt_text.count(include_marker) != 1:
-            raise RuntimeError("OpenAL Soft's bundled fmt has an unexpected include layout")
-        fmt_header.write_text(
-            fmt_text.replace(include_marker, include_marker + "#  include <stdlib.h>  // free\n"),
-            encoding="utf-8",
+        alc_source = source / "alc" / "alc.cpp"
+        alc_text = alc_source.read_text(encoding="utf-8")
+        old_transform = "std::views::transform(&ContextBase::EffectSlotCluster::operator*)"
+        new_transform = (
+            "std::views::transform([](auto const &cluster) -> auto & { return *cluster; })"
         )
+        if alc_text.count(old_transform) != 1:
+            raise RuntimeError("OpenAL Soft's effect slot transform has an unexpected layout")
+        alc_source.write_text(alc_text.replace(old_transform, new_transform), encoding="utf-8")
     args = [
         "-DLIBTYPE=STATIC",
         "-DALSOFT_UTILS=OFF",
@@ -230,6 +238,8 @@ def build_openal(ctx: BuildContext) -> None:
     ]
     if ctx.target.linux:
         args += ["-DALSOFT_BACKEND_ALSA=ON", "-DALSOFT_BACKEND_OSS=OFF"]
+    if ctx.target.windows:
+        args += ["-DALSOFT_ENABLE_MODULES=OFF"]
     cmake(ctx, source, *args)
     pkg_config = ctx.prefix / "lib" / "pkgconfig" / "openal.pc"
     _ensure_static_cpp_runtime(ctx, pkg_config)
@@ -349,7 +359,7 @@ def build_glib(ctx: BuildContext) -> None:
         proxy_libintl = extract(ctx, "proxy_libintl")
         shutil.copytree(
             proxy_libintl,
-            source / "subprojects" / "proxy-libintl",
+            source / "subprojects" / "proxy-libintl-0.5",
             dirs_exist_ok=True,
         )
     meson(
@@ -725,6 +735,9 @@ def build_harfbuzz(ctx: BuildContext) -> None:
         "-Dglib=disabled",
         "-Dgobject=disabled",
         "-Dcairo=disabled",
+        "-Draster=disabled",
+        "-Dvector=disabled",
+        "-Dgpu=disabled",
     ]
     if ctx.target.macos:
         args.append("-Dcoretext=enabled")
@@ -872,7 +885,9 @@ def build_openjpeg(ctx: BuildContext) -> None:
 
 
 def build_zimg(ctx: BuildContext) -> None:
-    autotools(ctx, extract(ctx, "zimg"), autoreconf=True)
+    source = extract(ctx, "zimg")
+    shutil.copytree(extract(ctx, "zimg_graphengine"), source / "graphengine", dirs_exist_ok=True)
+    autotools(ctx, source, autoreconf=True)
 
 
 def build_lc3(ctx: BuildContext) -> None:
@@ -1033,9 +1048,20 @@ def build_amf(ctx: BuildContext) -> None:
 
 
 def build_vpl(ctx: BuildContext) -> None:
+    source = extract(ctx, "vpl")
+    if ctx.target.windows:
+        header = source / "libvpl" / "src" / "windows" / "mfx_dispatcher_defs.h"
+        header_text = header.read_text(encoding="utf-8")
+        old_guard = "#if _MSC_VER < 1400\n"
+        if header_text.count(old_guard) != 1:
+            raise RuntimeError("libvpl's _MSC_VER guard was not found exactly once")
+        header.write_text(
+            header_text.replace(old_guard, "#if defined(_MSC_VER) && _MSC_VER < 1400\n"),
+            encoding="utf-8",
+        )
     cmake(
         ctx,
-        extract(ctx, "vpl"),
+        source,
         "-DCMAKE_INSTALL_BINDIR=/bin",
         "-DCMAKE_INSTALL_LIBDIR=/lib",
         "-DCMAKE_INSTALL_INCLUDEDIR=/include",

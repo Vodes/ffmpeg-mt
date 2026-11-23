@@ -3,8 +3,11 @@ from __future__ import annotations
 import hashlib
 import io
 import tarfile
+from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 
+import niquests
 import pytest
 
 import ffbuild.helpers as helpers
@@ -68,8 +71,8 @@ def test_archive_members_are_unique(tmp_path: Path) -> None:
 def test_windows_rust_toolchain_is_pinned_with_precompiled_targets() -> None:
     dockerfile = (ROOT / "docker" / "Dockerfile").read_text(encoding="utf-8")
 
-    assert "ARG RUST_VERSION=1.92.0" in dockerfile
-    assert "ARG RUSTUP_VERSION=1.28.2" in dockerfile
+    assert "ARG RUST_VERSION=1.100.0" in dockerfile
+    assert "ARG RUSTUP_VERSION=1.29.3" in dockerfile
     assert "--component rust-docs" in dockerfile
     assert "x86_64-pc-windows-gnu aarch64-pc-windows-gnullvm" in dockerfile
     assert "rust-src" not in dockerfile
@@ -82,10 +85,10 @@ def test_windows_rust_toolchain_is_pinned_with_precompiled_targets() -> None:
 def test_macos_uses_the_same_pinned_rustup_toolchain() -> None:
     workflow = (ROOT / ".github" / "workflows" / "build.yml").read_text(encoding="utf-8")
 
-    assert 'RUST_VERSION: "1.92.0"' in workflow
-    assert 'RUSTUP_VERSION: "1.28.2"' in workflow
+    assert 'RUST_VERSION: "1.100.0"' in workflow
+    assert 'RUSTUP_VERSION: "1.29.3"' in workflow
     assert (
-        'RUSTUP_SHA256: "20ef5516c31b1ac2290084199ba77dbbcaa1406c45c1d978ca68558ef5964ef5"'
+        'RUSTUP_SHA256: "63752a1919a3a4793173ec70f8f212621a7ce38ba6a246095984482f4de20f9f"'
         in workflow
     )
     assert "aarch64-apple-darwin/rustup-init" in workflow
@@ -343,10 +346,12 @@ def test_build_timestamp_defaults_to_current_time(
 
 
 def test_artifact_names(tmp_path: Path) -> None:
-    assert artifact_name(context(tmp_path, "linux-x86_64")) == ("ffmpeg-9.0.2-linux-x86_64.tar.zst")
-    assert artifact_name(context(tmp_path, "macos-arm64", True)) == (
-        "ffmpeg-9.0.2-macos-arm64-nonfree.tar.zst"
-    )
+    linux = context(tmp_path, "linux-x86_64")
+    macos = context(tmp_path, "macos-arm64", True)
+    for ctx in (linux, macos):
+        ctx.sources["ffmpeg"] = replace(ctx.sources["ffmpeg"], version="1.2.3")
+    assert artifact_name(linux) == "ffmpeg-1.2.3-linux-x86_64.tar.zst"
+    assert artifact_name(macos) == "ffmpeg-1.2.3-macos-arm64-nonfree.tar.zst"
 
 
 def test_download_rejects_bad_checksum(tmp_path: Path) -> None:
@@ -427,6 +432,49 @@ def test_http_text_fetch_checks_status(monkeypatch: pytest.MonkeyPatch) -> None:
     assert fetch_text("https://example.invalid/") == "release index"
     assert response.status_checked
     assert session.calls == [("https://example.invalid/", {"allow_redirects": True})]
+
+
+@pytest.mark.parametrize("failures", [1, 3])
+def test_http_download_retries_interrupted_streams(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failures: int
+) -> None:
+    attempts = 0
+
+    class InterruptedResponse:
+        def __enter__(self) -> InterruptedResponse:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            pass
+
+        def raise_for_status(self) -> None:
+            pass
+
+        def iter_content(self, chunk_size: int) -> Iterator[bytes]:
+            assert chunk_size == 1024 * 1024
+            if attempts <= failures:
+                yield b"partial"
+                raise niquests.exceptions.ChunkedEncodingError("interrupted")
+            yield b"complete"
+
+    class Session:
+        def get(self, _url: str, **_kwargs: object) -> InterruptedResponse:
+            nonlocal attempts
+            attempts += 1
+            return InterruptedResponse()
+
+    monkeypatch.setattr(helpers, "HTTP_SESSION", Session())
+    monkeypatch.setattr(helpers.time, "sleep", lambda _seconds: None)
+    destination = tmp_path / "download"
+    if failures == 3:
+        with pytest.raises(niquests.exceptions.ChunkedEncodingError):
+            download_url("https://example.invalid/archive", destination)
+        assert not destination.exists()
+        assert attempts == 3
+    else:
+        download_url("https://example.invalid/archive", destination)
+        assert destination.read_bytes() == b"complete"
+        assert attempts == 2
 
 
 def _archive_with_symlink(tmp_path: Path, link_target: str) -> Source:
@@ -559,7 +607,7 @@ def test_glib_stages_declared_libintl_fallback_on_macos(
 
     recipes.build_glib(context(tmp_path, "macos-arm64"))
 
-    staged = glib / "subprojects" / "proxy-libintl" / "meson.build"
+    staged = glib / "subprojects" / "proxy-libintl-0.5" / "meson.build"
     assert staged.read_text(encoding="utf-8") == "project('proxy-libintl')\n"
 
 
@@ -684,12 +732,15 @@ def test_windows_openal_pkg_config_has_com_dependencies(
 ) -> None:
     ctx = context(tmp_path, "windows-x86_64")
     source = tmp_path / "openal"
-    fmt_header = source / "fmt-11.1.1" / "include" / "fmt" / "format.h"
-    fmt_header.parent.mkdir(parents=True)
-    fmt_header.write_text("#  include <cstdint>  // uint32_t\n", encoding="utf-8")
+    alc_source = source / "alc" / "alc.cpp"
+    alc_source.parent.mkdir(parents=True)
+    alc_source.write_text(
+        "std::views::transform(&ContextBase::EffectSlotCluster::operator*)", encoding="utf-8"
+    )
     monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
 
-    def fake_cmake(*_args: object) -> None:
+    def fake_cmake(*args: object) -> None:
+        assert "-DALSOFT_ENABLE_MODULES=OFF" in args
         pkg_config = ctx.prefix / "lib" / "pkgconfig" / "openal.pc"
         pkg_config.parent.mkdir(parents=True)
         pkg_config.write_text("Libs: -lopenal\n", encoding="utf-8")
@@ -699,6 +750,7 @@ def test_windows_openal_pkg_config_has_com_dependencies(
 
     metadata = (ctx.prefix / "lib" / "pkgconfig" / "openal.pc").read_text(encoding="utf-8")
     assert {"-lole32", "-luuid", "-lc++"} <= set(metadata.split())
+    assert "return *cluster;" in alc_source.read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize(
@@ -796,6 +848,60 @@ def test_onevpl_declares_its_static_cpp_runtime(
 
     assert cmake_kwargs == {"install_prefix": "/", "install_destdir": ctx.prefix}
     assert "Libs.private: -lstdc++\n" in pkg_config.read_text(encoding="utf-8")
+
+
+def test_windows_dvdnav_matches_dvdread_bitfield_layout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "dvdnav"
+    source.mkdir()
+    meson_file = source / "meson.build"
+    meson_file.write_text("        '-mno-ms-bitfields',\n", encoding="utf-8")
+    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
+
+    def fake_meson(*_args: object) -> None:
+        assert "-mno-ms-bitfields" not in meson_file.read_text(encoding="utf-8")
+
+    monkeypatch.setattr(recipes, "meson", fake_meson)
+    recipes.build_dvdnav(context(tmp_path, "windows-x86_64"))
+
+
+def test_windows_onevpl_does_not_treat_mingw_as_old_msvc(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = context(tmp_path, "windows-x86_64")
+    source = tmp_path / "vpl"
+    header = source / "libvpl" / "src" / "windows" / "mfx_dispatcher_defs.h"
+    header.parent.mkdir(parents=True)
+    header.write_text("#if _MSC_VER < 1400\n", encoding="utf-8")
+    monkeypatch.setattr(recipes, "extract", lambda _ctx, _name: source)
+
+    def fake_cmake(*_args: object, **_kwargs: object) -> None:
+        assert header.read_text(encoding="utf-8") == "#if defined(_MSC_VER) && _MSC_VER < 1400\n"
+        pkg_config = ctx.prefix / "lib" / "pkgconfig" / "vpl.pc"
+        pkg_config.parent.mkdir(parents=True)
+        pkg_config.write_text("Libs: -lvpl\n", encoding="utf-8")
+
+    monkeypatch.setattr(recipes, "cmake", fake_cmake)
+    recipes.build_vpl(ctx)
+
+
+def test_zimg_build_stages_pinned_graphengine(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "zimg"
+    source.mkdir()
+    graphengine = tmp_path / "graphengine"
+    graphengine.mkdir()
+    (graphengine / "COPYING").write_text("license", encoding="utf-8")
+    sources = {"zimg": source, "zimg_graphengine": graphengine}
+    monkeypatch.setattr(recipes, "extract", lambda _ctx, name: sources[name])
+
+    def fake_autotools(*_args: object, **_kwargs: object) -> None:
+        assert (source / "graphengine" / "COPYING").read_text(encoding="utf-8") == "license"
+
+    monkeypatch.setattr(recipes, "autotools", fake_autotools)
+    recipes.build_zimg(context(tmp_path, "windows-x86_64"))
 
 
 def test_libdovi_builds_a_static_c_api_for_libplacebo(

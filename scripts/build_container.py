@@ -9,11 +9,11 @@ from pathlib import Path
 MANYLINUX_IMAGES = {
     "x86_64": (
         "quay.io/pypa/manylinux_2_34_x86_64"
-        "@sha256:0b4acc5b3c4c797bb9a6286c4d15039962f61ee0c5426753afd5cbe45baebfc4"
+        "@sha256:994ad4b59d4eb3be4b84f177b001ef8d5fea57b81e83b4f9171dfcc4a6d6bdee"
     ),
     "aarch64": (
         "quay.io/pypa/manylinux_2_34_aarch64"
-        "@sha256:db1a485b015c1d9a6d7e2929367a69a6f772964be06cca8fe585f959a47ec0b7"
+        "@sha256:2027d9b991e2e9f87541b78d8dd28968984f82796b08449890ac04aaf2ae044f"
     ),
 }
 

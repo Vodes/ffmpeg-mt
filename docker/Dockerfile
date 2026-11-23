@@ -1,5 +1,5 @@
-ARG MANYLINUX_IMAGE=quay.io/pypa/manylinux_2_34_x86_64@sha256:0b4acc5b3c4c797bb9a6286c4d15039962f61ee0c5426753afd5cbe45baebfc4
-FROM ubuntu:22.04@sha256:b8b6ee6aa931ecd9d0d952abc34dc0e5f7c6a30c6bb71b079fe399fde0329c02 AS llvm_mingw_runtime
+ARG MANYLINUX_IMAGE=quay.io/pypa/manylinux_2_34_x86_64@sha256:994ad4b59d4eb3be4b84f177b001ef8d5fea57b81e83b4f9171dfcc4a6d6bdee
+FROM ubuntu:22.04@sha256:f64b2ffc2f10ab8f8505aa56b2664bd846cbb9df87c7e2532e30f7667021c0e6 AS llvm_mingw_runtime
 
 FROM ${MANYLINUX_IMAGE} AS packages
 
@@ -13,10 +13,10 @@ RUN dnf -y install dnf-plugins-core epel-release && \
     if [ "$(uname -m)" = x86_64 ]; then dnf -y install mesa-vulkan-drivers; fi && \
     dnf clean all
 
-ARG RUST_VERSION=1.92.0
-ARG RUSTUP_VERSION=1.28.2
-ARG RUSTUP_X86_64_SHA256=20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c
-ARG RUSTUP_AARCH64_SHA256=e3853c5a252fca15252d07cb23a1bdd9377a8c6f3efa01531109281ae47f841c
+ARG RUST_VERSION=1.100.0
+ARG RUSTUP_VERSION=1.29.3
+ARG RUSTUP_X86_64_SHA256=b1c8cb14e30889e7e2999e6b69e62d9e9b9ffc0f4df8180564d306d9680e6c55
+ARG RUSTUP_AARCH64_SHA256=9f608c142e0e38a78957d0661ba1dfaf0b6fb37184cfaa4b9a0aa57af6184282
 ARG TARGETARCH
 ENV RUSTUP_HOME=/opt/rustup
 ENV CARGO_HOME=/opt/cargo
@@ -43,8 +43,8 @@ RUN case "${TARGETARCH}" in \
 
 FROM packages AS shader_tools
 
-ARG SHADERC_VERSION=2026.2
-ARG SHADERC_SHA256=f924178e75e3293082481b25ed64d5e48a795b479dac3bd3c83d23070855df42
+ARG SHADERC_VERSION=2026.4
+ARG SHADERC_SHA256=f06ce5bcca94e5df7f34e115743597d0ad2e13c5fe9213c67dc8c76031241947
 
 WORKDIR /tmp/shaderc
 RUN curl -fL --retry 5 \
@@ -62,7 +62,7 @@ RUN curl -fL --retry 5 \
 
 FROM shader_tools AS base_builder
 
-RUN python3.12 -m pip install --no-cache-dir uv==0.8.22
+RUN python3.12 -m pip install --no-cache-dir uv==0.13.9
 
 WORKDIR /src
 
@@ -70,9 +70,9 @@ FROM base_builder AS linux_builder
 
 FROM base_builder AS builder
 
-ARG LLVM_MINGW_VERSION=20260616
-ARG LLVM_MINGW_X86_64_SHA256=534b92e067b22a6b4441f48ae9240a3341b17825d04d577eab0cf85c44b4deda
-ARG LLVM_MINGW_AARCH64_SHA256=e7e5d135d93d3f2a3beaaea633a5b0e66ac75391a53feae654391913dd76102b
+ARG LLVM_MINGW_VERSION=20261117
+ARG LLVM_MINGW_X86_64_SHA256=e7a15a49a2ea95e9f3d8a9d0cfabe5052a4b10fb4777cc54de5a8c27b64bb701
+ARG LLVM_MINGW_AARCH64_SHA256=6d9442ead9ace3b3e4c3389bfef69f93f873305e0705e6cc60978ac895320872
 ARG TARGETARCH
 
 WORKDIR /tmp/llvm-mingw
